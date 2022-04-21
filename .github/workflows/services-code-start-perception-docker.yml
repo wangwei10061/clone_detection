@@ -3,11 +3,11 @@ name: services-docker-upload
 on:
   push:
     tags:
-      - v*
+      - code-start-perception-v*
     
 
 env:
-  IMAGE_NAME: LSICCDS_server
+  IMAGE_NAME: lsiccds_server_code_start_perception
 
 jobs:
   push:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build image
-        run: docker build --no-cache --tag $IMAGE_NAME --file Dockerfiles/producer/Dockerfile .
+        run: docker build --no-cache --tag $IMAGE_NAME --file Dockerfiles/CodeStartPerception/Dockerfile .
       - name: Log into registry
         run: echo "${{ secrets.ACCESS_TOKEN }}" | docker login -u zhangxunhui --password-stdin
 
@@ -27,7 +27,7 @@ jobs:
 
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
 
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^code-start-perception-v//')
 
           # Use Docker `latest` tag convention
           [ "$VERSION" == "master" ] && VERSION=latest
