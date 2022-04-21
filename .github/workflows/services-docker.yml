@@ -1,0 +1,38 @@
+name: services-docker-upload
+
+on:
+  push:
+    tags:
+      - v*
+    
+
+env:
+  IMAGE_NAME: LSICCDS_server
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build image
+        run: docker build --no-cache --tag $IMAGE_NAME --file Dockerfiles/producer/Dockerfile .
+      - name: Log into registry
+        run: echo "${{ secrets.ACCESS_TOKEN }}" | docker login -u zhangxunhui --password-stdin
+
+      - name: Push image
+        run: |
+          IMAGE_ID=zhangxunhui/$IMAGE_NAME
+
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+
+          # Use Docker `latest` tag convention
+          [ "$VERSION" == "master" ] && VERSION=latest
+
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
