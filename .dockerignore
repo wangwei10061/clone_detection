@@ -1,0 +1,8 @@
+.github/
+dependencies/
+Dockerfiles/
+*.log
+*.sh
+.gitignore
+LICENSE
+README.md
