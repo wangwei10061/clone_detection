@@ -17,8 +17,16 @@ docker ps # test whether docker command can be used
 
 1. `docker network create LSICCDS_server` to create the network.
 2. `cd dependencies`
-2. `docker-compose up -d` to install all the dependent services, including gitea (the dependent mysql), rabbitmq, elasticsearch, kibana.
+3. `docker-compose up -d` to install all the dependent services, including gitea (the dependent mysql), rabbitmq, elasticsearch, kibana.
   - Error may occur when installing elasticsearch and kibana, you need to:
     - `sudo chmod 777 -R dependencies/elasticsearch`
     - `sudo chmod 777 -R dependencies/kibana`
     - `docker-compose up -d`
+4. Configure the gitea settings for initialization. See the figure below.
+<details>
+  <summary>Click to present.</summary>
+
+  You need to change the IP address and the administrator account by yourself.
+
+  ![image](pics/gitea-setting.jpeg)
+</details>
