@@ -1,6 +1,6 @@
 #! /bin/bash
 
-function restart_service() {
+function restart_service {
     old_pid=$(ps ax|grep $1.py|grep -v grep|awk '{print $1}')
     echo "old_pid=${old_pid}"
     if [ -z $old_pid ];then
