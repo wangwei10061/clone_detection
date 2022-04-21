@@ -1,0 +1,95 @@
+# date: 2022-04-20
+# install dependencies, including gitea, mysql, kafka, elasticsearch
+
+version: "3"
+
+networks:
+  LSICCDS_server:
+    external: true
+
+services:
+  gitea:
+    image: gitea/gitea:1.16.5
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=db:3307
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=gitea
+    restart: always
+    networks:
+      - LSICCDS_server
+    volumes:
+      - ./gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000" # here, we don't recommend using other port numbers, because inside gitea, also use default port, e.g., localhost:3000/api/swagger
+      - "2222:22"
+    depends_on:
+      - mysql
+  mysql:
+    image: mysql:8.0.28
+    container_name: mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=gitea
+      - MYSQL_USER=gitea
+      - MYSQL_PASSWORD=gitea
+      - MYSQL_DATABASE=gitea
+    networks:
+      - LSICCDS_server
+    volumes:
+      - ./mysql:/var/lib/mysql
+    ports:
+      - "3307:3306"
+
+  rabbitmq:
+    image: rabbitmq:3.8.22-management
+    container_name: 'rabbitmq'
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./rabbitmq/data/:/var/lib/rabbitmq/
+      - ./rabbitmq/log/:/var/log/rabbitmq
+    networks:
+      - LSICCDS_server
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.1.2
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - cluster.name=data-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - LSICCDS_server
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.1.2
+    container_name: kibana
+    restart: always
+    environment:
+      SERVER_NAME: localhost
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    volumes:
+      - ./kibana/data:/usr/share/kibana/data
+    networks:
+      - LSICCDS_server
+    depends_on:
+      - elasticsearch
