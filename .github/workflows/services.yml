@@ -1,4 +1,4 @@
-name: Django Deploy CD
+name: LSICCDS server services CD
 on:
   push:
     branches:
