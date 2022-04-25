@@ -11,15 +11,15 @@ services:
   gitea:
     image: gitea/gitea:1.16.5
     container_name: gitea
+    restart: always
     environment:
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=mysql
-      - GITEA__database__HOST=db:3307
+      - GITEA__database__HOST=mysql:3307
       - GITEA__database__NAME=gitea
       - GITEA__database__USER=gitea
       - GITEA__database__PASSWD=gitea
-    restart: always
     networks:
       - LSICCDS_server
     volumes:
@@ -27,7 +27,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "3000:3000" # here, we don't recommend using other port numbers, because inside gitea, also use default port, e.g., localhost:3000/api/swagger
+      - "3000:3000"
       - "2222:22"
     depends_on:
       - mysql
