@@ -1,5 +1,6 @@
 dependencies/*
 !dependencies/docker-compose.yml
+services/config.yml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
