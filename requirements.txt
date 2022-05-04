@@ -1,1 +1,2 @@
 PyYAML==6.0
+dulwich==0.20.35
