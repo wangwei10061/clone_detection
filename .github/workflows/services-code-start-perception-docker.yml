@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - code-start-perception-v*
-    
+
 
 env:
   IMAGE_NAME: lsiccds_server_code_start_perception
