@@ -5,8 +5,9 @@
 import os
 import sys
 
+import dulwich
+from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
-from dulwich.walk import WalkEntry, Walker
 from ObjectIdx import createObjectIdx
 from ObjectPack import createObjectPack
 from utils import read_config
@@ -47,16 +48,27 @@ def handle_repositories(repositories_path: str):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for reponame_git_path in reponame_git_paths:
-            """Get all the commits.
-            Commits are stored in three different ways:
-            1. loose commits
-            2. packed commits
-            3. submodule commits
-            4. lfs是否需要考虑
-            有了dulwich以后只需要考虑commit的遍历以及每个commit与parent之间的变化就可以了
-            """
+            """Get all the commits."""
+
+            commit_shas = []
+            commits = []
+
             r = Repo(reponame_git_path)
-            print(type(r))
+            object_store = r.object_store
+            object_shas = list(iter(object_store))
+            for object_sha in object_shas:
+                obj = object_store[object_sha]
+                if isinstance(obj, Tag):
+                    pass
+                elif isinstance(obj, Blob):
+                    pass
+                elif isinstance(obj, Commit):
+                    commits.append(obj)
+                    commit_shas.append(object_sha)
+                elif isinstance(obj, Tree):
+                    pass
+                else:
+                    raise Exception("error type")
 
             handle_pack(reponame_git_path=reponame_git_path)
 
