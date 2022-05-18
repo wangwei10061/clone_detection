@@ -4,35 +4,129 @@
 
 import os
 import sys
+from difflib import SequenceMatcher
 
-import dulwich
+from dulwich.diff_tree import TreeChange
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
-from ObjectIdx import createObjectIdx
-from ObjectPack import createObjectPack
+from dulwich.walk import WalkEntry
 from utils import read_config
 
 
-def handle_pack(reponame_git_path: str):
-    """Handle the pack file in a repository."""
-    # whether pack file exists
-    pack_folder = os.path.join(reponame_git_path, "objects/pack")
-    pack_file_names = [
-        name for name in os.listdir(pack_folder) if name.endswith(".pack")
-    ]
-    if len(pack_file_names) > 0:
-        for pack_file_name in pack_file_names:
-            idx_file_name = pack_file_name[:-4] + "idx"
-            object_idx = createObjectIdx(
-                filepath=os.path.join(pack_folder, idx_file_name)
+class HandleRepository(object):
+    def __init__(self, repository_path) -> None:
+        self.repository_path = repository_path
+        self.repo = Repo(self.repository_path)
+
+    def handle_tree_change(self, tree_change: TreeChange):
+        """
+        get the changed relative filepath and changed lines of a TreeChange object
+        return:
+        changed_path: b'', changed_new_lines: list
+        None, None # if there is no change
+        """
+        changed_path = None
+        changed_new_lines = None
+        change_type = tree_change.type
+        if change_type == "add":
+            changed_new_lines = self.extract_diff(
+                old_content=[],
+                new_content=self.repo.object_store[
+                    tree_change.new.sha
+                ].data.split(b"\n"),
             )
-            object_pack = createObjectPack(
-                object_idx=object_idx,
-                filepath=os.path.join(pack_folder, pack_file_name),
+            changed_path = tree_change.new.path
+        elif change_type == "modify":
+            changed_new_lines = self.extract_diff(
+                old_content=self.repo.object_store[
+                    tree_change.old.sha
+                ].data.split(b"\n"),
+                new_content=self.repo.object_store[
+                    tree_change.new.sha
+                ].data.split(b"\n"),
             )
-            print(object_pack)
-    else:
-        return
+            changed_path = tree_change.new.path
+        elif change_type == "delete":
+            pass
+        else:
+            raise Exception("type error")
+        if changed_new_lines is not None and len(changed_new_lines) == 0:
+            changed_new_lines = None
+            changed_path = None
+        return changed_path, changed_new_lines
+
+    def extract_diff(self, old_content: list, new_content: list):
+        changed_new_lines = []  # record all the changed lines for the new file
+        for tag, _, _, j1, j2 in SequenceMatcher(
+            None, old_content, new_content
+        ).get_opcodes():
+            if tag == "equal" or tag == "delete":
+                pass
+            elif tag == "insert" or tag == "replace":
+                changed_new_lines.extend([i for i in range(j1 + 1, j2 + 1)])
+            else:
+                raise Exception("type error")
+        return changed_new_lines
+
+    def run(self):
+        """Get all the commits."""
+
+        commit_shas = []
+        commits = []
+
+        object_store = self.repo.object_store
+        object_shas = list(iter(object_store))
+        for object_sha in object_shas:
+            obj = object_store[object_sha]
+            if isinstance(obj, Tag):
+                pass
+            elif isinstance(obj, Blob):
+                pass
+            elif isinstance(obj, Commit):
+                commits.append(obj)
+                commit_shas.append(object_sha)
+            elif isinstance(obj, Tree):
+                pass
+            else:
+                raise Exception("error type")
+
+        for commit in commits:
+            parents = commit.parents
+            walk_entry = WalkEntry(
+                self.repo.get_walker(include=[commit.id]), commit
+            )
+            tree_changes = (
+                walk_entry.changes()
+            )  # get all the TreeChange objects
+            # handle each TreeChange, for parents > 1, handle each TreeChange list
+            changes = (
+                {}
+            )  # record all the changes, key: relative filepath; value: set() changed lines
+            if len(parents) > 1:
+                for t_changes in tree_changes:
+                    for t_change in t_changes:
+                        changed_path, changed_lines = self.handle_tree_change(
+                            t_change
+                        )
+                        if (
+                            changed_path is not None
+                            and changed_lines is not None
+                        ):
+                            changes.setdefault(changed_path, set())
+                            changes[changed_path] = set(
+                                changes[changed_path]
+                            ).union(set(changed_lines))
+            else:
+                for t_change in tree_changes:
+                    changed_path, changed_lines = self.handle_tree_change(
+                        t_change
+                    )
+                    if changed_path is not None and changed_lines is not None:
+                        changes.setdefault(changed_path, set())
+                        changes[changed_path] = set(
+                            changes[changed_path]
+                        ).union(set(changed_lines))
+            print("pause")
 
 
 def handle_repositories(repositories_path: str):
@@ -48,31 +142,9 @@ def handle_repositories(repositories_path: str):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for reponame_git_path in reponame_git_paths:
-            """Get all the commits."""
-
-            commit_shas = []
-            commits = []
-
-            r = Repo(reponame_git_path)
-            object_store = r.object_store
-            object_shas = list(iter(object_store))
-            for object_sha in object_shas:
-                obj = object_store[object_sha]
-                if isinstance(obj, Tag):
-                    pass
-                elif isinstance(obj, Blob):
-                    pass
-                elif isinstance(obj, Commit):
-                    commits.append(obj)
-                    commit_shas.append(object_sha)
-                elif isinstance(obj, Tree):
-                    pass
-                else:
-                    raise Exception("error type")
-
-            handle_pack(reponame_git_path=reponame_git_path)
-
-            print("pause")
+            # handle one repository
+            handler = HandleRepository(repository_path=reponame_git_path)
+            handler.run()
 
 
 def main():
