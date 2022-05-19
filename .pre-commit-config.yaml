@@ -5,25 +5,30 @@ repos:
     -   id: check-yaml
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
+        exclude: services/parser/java/*
 
 -   repo: https://github.com/asottile/seed-isort-config
     rev: v2.2.0
     hooks:
     -   id: seed-isort-config
+        exclude: services/parser/java/*
 
 -   repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
     hooks:
     -   id: isort
+        exclude: services/parser/java/*
 
 -   repo: https://github.com/psf/black
     rev: 22.3.0
     hooks:
-    -    id: black
-         language: python
-         types: [python]
+    -   id: black
+        language: python
+        types: [python]
+        exclude: services/parser/java/*
 
 -   repo: https://gitlab.com/pycqa/flake8
     rev: 4.0.1
     hooks:
     -   id: flake8
+        exclude: services/parser/java/*
