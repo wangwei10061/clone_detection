@@ -1,13 +1,18 @@
-from antlr4 import CommonTokenStream, FileStream, ParseTreeWalker
-from java.JavaLexer import JavaLexer
-from java.JavaParser import JavaParser
-from java.JavaParserListener import JavaParserListener
+from parser.java.JavaLexer import JavaLexer
+from parser.java.JavaParser import JavaParser
+from parser.java.JavaParserListener import JavaParserListener
+
+from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
 
 
 class FuncExtractor(JavaParserListener):
-    def __init__(self, filepath):
+    def __init__(self, filepath, content):
         self.filepath = filepath
+        self.content = content
         self.methods = []  # used to store the methods in the file
+        self.line_method_dict = (
+            {}
+        )  # the dictionary for line number and method relationship, key is line number; value is self.methods' index
         self.tokens = None
 
     def enterMethodDeclaration(self, ctx: JavaParser.MethodDeclarationContext):
@@ -17,7 +22,11 @@ class FuncExtractor(JavaParserListener):
         end_index = ctx.stop.tokenIndex
         tokens = self.tokens[start_index : end_index + 1]
         tokens = [
-            token.text.strip() for token in tokens if token.text.strip() != ""
+            token.text.strip()
+            for token in tokens
+            if token.text.strip() != ""
+            and token.type != JavaLexer.COMMENT
+            and token.type != JavaLexer.LINE_COMMENT
         ]
         self.methods.append(
             {
@@ -27,6 +36,8 @@ class FuncExtractor(JavaParserListener):
                 "tokens": tokens,
             }
         )
+        for i in range(start_line, end_line + 1):
+            self.line_method_dict[i] = len(self.methods) - 1
 
     def parse_file(self):
         """
@@ -34,7 +45,7 @@ class FuncExtractor(JavaParserListener):
         return:
             - List of dict {filepath, start, end, tokens}
         """
-        input = FileStream(self.filepath)
+        input = InputStream(self.content.decode())
         lexer = JavaLexer(input)
         tokens_stream = CommonTokenStream(lexer)
         self.tokens = tokens_stream.tokens
@@ -42,7 +53,7 @@ class FuncExtractor(JavaParserListener):
         tree = parser.compilationUnit()
         walker = ParseTreeWalker()
         walker.walk(self, tree)
-        return self.methods
+        return self.methods, self.line_method_dict
 
 
 if __name__ == "__main__":

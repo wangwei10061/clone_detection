@@ -5,6 +5,7 @@
 import os
 import sys
 from difflib import SequenceMatcher
+from parser.FuncExtractor import FuncExtractor
 
 from dulwich.diff_tree import TreeChange
 from dulwich.objects import Blob, Commit, Tag, Tree
@@ -68,6 +69,13 @@ class HandleRepository(object):
                 raise Exception("type error")
         return changed_new_lines
 
+    def extract_n_grams(self, tokens: list, n=5):
+        ngrams = []
+        for i in range(0, len(tokens) - n + 1):
+            ngram = (" ".join(tokens[i : i + n])).lower()
+            ngrams.append(ngram)
+        return ngrams
+
     def run(self):
         """Get all the commits."""
 
@@ -101,7 +109,7 @@ class HandleRepository(object):
             # handle each TreeChange, for parents > 1, handle each TreeChange list
             changes = (
                 {}
-            )  # record all the changes, key: relative filepath; value: set() changed lines
+            )  # record all the changes, key: relative filepath:objsha; value: set() changed lines
             if len(parents) > 1:
                 for t_changes in tree_changes:
                     for t_change in t_changes:
@@ -112,20 +120,52 @@ class HandleRepository(object):
                             changed_path is not None
                             and changed_lines is not None
                         ):
-                            changes.setdefault(changed_path, set())
-                            changes[changed_path] = set(
-                                changes[changed_path]
-                            ).union(set(changed_lines))
+                            changes.setdefault(
+                                changed_path + b":" + t_change.new.sha, set()
+                            )
+                            changes[
+                                changed_path + b":" + t_change.new.sha
+                            ] = set(
+                                changes[changed_path + ":" + t_change.new.sha]
+                            ).union(
+                                set(changed_lines)
+                            )
             else:
                 for t_change in tree_changes:
                     changed_path, changed_lines = self.handle_tree_change(
                         t_change
                     )
                     if changed_path is not None and changed_lines is not None:
-                        changes.setdefault(changed_path, set())
-                        changes[changed_path] = set(
-                            changes[changed_path]
+                        changes.setdefault(
+                            changed_path + b":" + t_change.new.sha, set()
+                        )
+                        changes[changed_path + b":" + t_change.new.sha] = set(
+                            changes[changed_path + b":" + t_change.new.sha]
                         ).union(set(changed_lines))
+
+            # handle all the changes
+            for path_sha, line_set in changes.items():
+                path_sha_tuple = path_sha.split(b":")
+                filepath = path_sha_tuple[0]
+                object_sha = path_sha_tuple[1]
+                # read file content
+                content = self.repo.object_store[object_sha].data
+                # read all the methods, and line method index relationship
+                methods, line_method_dict = FuncExtractor(
+                    filepath=filepath, content=content
+                ).parse_file()
+                # extract the changed methods
+                changed_method_indexes = list(
+                    set([line_method_dict[line] for line in line_set])
+                )
+                changed_methods = [
+                    methods[index] for index in changed_method_indexes
+                ]
+                # for changed methods, extract N-Gram list
+                for changed_method in changed_methods:
+                    ngrams = self.extract_n_grams(changed_method["tokens"])
+                    # update the inverted index of elastic search
+                    print(ngrams)
             print("pause")
 
 
