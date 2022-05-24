@@ -16,10 +16,12 @@ services:
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=mysql
-      - GITEA__database__HOST=mysql:3307
+      - GITEA__database__HOST=host.docker.internal:3307
       - GITEA__database__NAME=gitea
       - GITEA__database__USER=gitea
       - GITEA__database__PASSWD=gitea
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - LSICCDS_server
     volumes:
@@ -46,6 +48,8 @@ services:
       - ./mysql:/var/lib/mysql
     ports:
       - "3307:3306"
+    security_opt:
+      - seccomp:unconfined
 
   rabbitmq:
     image: rabbitmq:3.8.22-management
@@ -64,13 +68,8 @@ services:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.1.2
     container_name: elasticsearch
     restart: always
-    environment:
-      - cluster.name=data-cluster
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
-      - discovery.type=single-node
-      - xpack.security.enabled=false
     volumes:
+      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
       - ./elasticsearch/data:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
@@ -82,12 +81,10 @@ services:
     image: docker.elastic.co/kibana/kibana:8.1.2
     container_name: kibana
     restart: always
-    environment:
-      SERVER_NAME: localhost
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:
       - "5601:5601"
     volumes:
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
       - ./kibana/data:/usr/share/kibana/data
     networks:
       - LSICCDS_server
