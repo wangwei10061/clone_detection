@@ -2,3 +2,4 @@ PyYAML==6.0
 dulwich==0.20.35
 pre-commit==2.19.0
 antlr4-python3-runtime==4.10
+elasticsearch==8.2.0
