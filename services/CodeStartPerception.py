@@ -11,13 +11,14 @@ from dulwich.diff_tree import TreeChange
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
-from utils import read_config
+from utils import connect_es, read_config
 
 
 class HandleRepository(object):
-    def __init__(self, repository_path) -> None:
+    def __init__(self, repository_path, config) -> None:
         self.repository_path = repository_path
         self.repo = Repo(self.repository_path)
+        self.es_client = connect_es(config=config)
 
     def handle_tree_change(self, tree_change: TreeChange):
         """
@@ -169,7 +170,7 @@ class HandleRepository(object):
             print("pause")
 
 
-def handle_repositories(repositories_path: str):
+def handle_repositories(repositories_path: str, config: dict):
     """Handle all the repositories in the directory."""
 
     # iterate all the ownernames
@@ -183,7 +184,9 @@ def handle_repositories(repositories_path: str):
         ]
         for reponame_git_path in reponame_git_paths:
             # handle one repository
-            handler = HandleRepository(repository_path=reponame_git_path)
+            handler = HandleRepository(
+                repository_path=reponame_git_path, config=config
+            )
             handler.run()
 
 
@@ -206,7 +209,7 @@ def main():
         print("Error: gitea repositories_path configration not found")
         sys.exit(1)
 
-    handle_repositories(repositories_path=repositories_path)
+    handle_repositories(repositories_path=repositories_path, config=config)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 # date: 2022-04-23
 
 import yaml
+from elasticsearch import Elasticsearch
 
 
 def read_config(config_path):
@@ -20,3 +21,9 @@ def read_variable_length_bytes(readF):
     while len(result) == 0 or result[-1] & 0x80:
         result.append(readF(1)[0])
     return result
+
+
+def connect_es(config):
+    urls = config["elasticsearch"]["url"]
+    client = Elasticsearch(urls)
+    return client
