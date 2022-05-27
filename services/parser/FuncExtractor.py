@@ -51,14 +51,17 @@ class FuncExtractor(JavaParserListener):
         return:
             - List of dict {filepath, start, end, tokens}
         """
-        input = InputStream(self.content.decode())
-        lexer = JavaLexer(input)
-        tokens_stream = CommonTokenStream(lexer)
-        self.tokens = tokens_stream.tokens
-        parser = JavaParser(tokens_stream)
-        tree = parser.compilationUnit()
-        walker = ParseTreeWalker()
-        walker.walk(self, tree)
+        if self.filepath.endswith(b".java"):
+            input = InputStream(self.content.decode())
+            lexer = JavaLexer(input)
+            tokens_stream = CommonTokenStream(lexer)
+            self.tokens = tokens_stream.tokens
+            parser = JavaParser(tokens_stream)
+            tree = parser.compilationUnit()
+            walker = ParseTreeWalker()
+            walker.walk(self, tree)
+        else:
+            pass  # Currently do not support other programming languages
         return self.methods, self.line_method_dict
 
 

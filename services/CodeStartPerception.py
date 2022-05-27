@@ -12,7 +12,6 @@ from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
 from ESUtils import ESUtils
-from iteration_utilities import deepflatten
 from MySQLUtils import MySQLUtils
 from utils import read_config
 
@@ -59,28 +58,40 @@ class HandleRepository(object):
         changed_path = None
         changed_new_lines = None
         change_type = tree_change.type
-        if change_type == "add":
-            changed_new_lines = self.extract_diff(
-                old_content=[],
-                new_content=self.repo.object_store[
-                    tree_change.new.sha
-                ].data.split(b"\n"),
-            )
+        file_support = True
+        if change_type == "add" or change_type == "modify":
             changed_path = tree_change.new.path
-        elif change_type == "modify":
-            changed_new_lines = self.extract_diff(
-                old_content=self.repo.object_store[
-                    tree_change.old.sha
-                ].data.split(b"\n"),
-                new_content=self.repo.object_store[
-                    tree_change.new.sha
-                ].data.split(b"\n"),
-            )
-            changed_path = tree_change.new.path
-        elif change_type == "delete":
-            pass
+            if not changed_path.endswith(b".java"):
+                file_support = False
+            else:
+                pass  # currently do not support other programming languages
+        if file_support:
+            if change_type == "add":
+                changed_new_lines = self.extract_diff(
+                    old_content=[],
+                    new_content=self.repo.object_store[
+                        tree_change.new.sha
+                    ].data.split(b"\n"),
+                )
+            elif change_type == "modify":
+                try:
+                    changed_new_lines = self.extract_diff(
+                        old_content=self.repo.object_store[
+                            tree_change.old.sha
+                        ].data.split(b"\n"),
+                        new_content=self.repo.object_store[
+                            tree_change.new.sha
+                        ].data.split(b"\n"),
+                    )
+                except Exception:
+                    print("pause")
+            elif change_type == "delete":
+                pass
+            else:
+                raise Exception("type error")
         else:
-            raise Exception("type error")
+            changed_path = None
+            changed_new_lines = None
         if changed_new_lines is not None and len(changed_new_lines) == 0:
             changed_new_lines = None
             changed_path = None
@@ -119,7 +130,13 @@ class HandleRepository(object):
         ).parse_file()
         # extract the changed methods
         changed_method_indexes = list(
-            set([line_method_dict[line] for line in line_set])
+            set(
+                [
+                    line_method_dict[line]
+                    for line in line_set
+                    if line in line_method_dict
+                ]
+            )
         )
         changed_methods = [methods[index] for index in changed_method_indexes]
         # for changed methods, extract N-Gram list
@@ -128,7 +145,7 @@ class HandleRepository(object):
             # update the inverted index of elastic search
             for ngram in ngrams:
                 es_data = {
-                    "_index": "test",
+                    "_index": "n_grams_test2",
                     "doc_as_upsert": True,
                     "doc": {
                         "ownername": self.ownername,
@@ -159,8 +176,12 @@ class HandleRepository(object):
             {}
         )  # record all the changes, key: relative filepath:objsha; value: set() changed lines
         if len(commit.parents) > 1:
-            tree_changes = list(deepflatten(tree_changes))
+            tree_changes = [item for t_cs in tree_changes for item in t_cs]
         for t_change in tree_changes:
+            if type(t_change) != TreeChange:
+                raise Exception(
+                    "HandleRepository.handle_one_commit Error: TreeChange is not the right type!"
+                )
             changed_path, changed_lines = self.handle_tree_change(t_change)
             if changed_path is not None and changed_lines is not None:
                 changes.setdefault(
@@ -175,7 +196,7 @@ class HandleRepository(object):
             es_data_bulk.extend(
                 self.extract_one_file_change(commit_sha, path_sha, line_set)
             )
-            if len(es_data_bulk) == 100:
+            if len(es_data_bulk) >= 1000:
                 self.es_utils.insert_es_bulk(es_data_bulk)
                 del es_data_bulk[0 : len(es_data_bulk)]
 
