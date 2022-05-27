@@ -27,6 +27,12 @@ class FuncExtractor(JavaParserListener):
             if token.text.strip() != ""
             and token.type != JavaLexer.COMMENT
             and token.type != JavaLexer.LINE_COMMENT
+            and token.type != JavaLexer.LPAREN
+            and token.type != JavaLexer.RPAREN
+            and token.type != JavaLexer.LBRACE
+            and token.type != JavaLexer.RBRACE
+            and token.type != JavaLexer.LBRACK
+            and token.type != JavaLexer.RBRACK
         ]
         self.methods.append(
             {

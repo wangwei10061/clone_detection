@@ -3,7 +3,7 @@
 # date: 2022-04-23
 
 import yaml
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 
 
 def read_config(config_path):
@@ -27,3 +27,7 @@ def connect_es(config):
     urls = config["elasticsearch"]["url"]
     client = Elasticsearch(urls)
     return client
+
+
+def insert_es_bulk(client, bulk):
+    helpers.bulk(client, bulk)

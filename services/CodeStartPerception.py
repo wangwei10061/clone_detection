@@ -11,13 +11,15 @@ from dulwich.diff_tree import TreeChange
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
-from utils import connect_es, read_config
+from utils import connect_es, insert_es_bulk, read_config
 
 
 class HandleRepository(object):
     def __init__(self, repository_path, config) -> None:
         self.repository_path = repository_path
         self.repo = Repo(self.repository_path)
+        self.ownername = self.repo.path.split("/")[-2]
+        self.reponame = self.repo.path.split("/")[-1].split(".")[0]
         self.es_client = connect_es(config=config)
 
     def handle_tree_change(self, tree_change: TreeChange):
@@ -99,6 +101,8 @@ class HandleRepository(object):
             else:
                 raise Exception("error type")
 
+        es_data_bulk = []  # store the actions of elasticsearch
+
         for commit in commits:
             parents = commit.parents
             walk_entry = WalkEntry(
@@ -166,7 +170,26 @@ class HandleRepository(object):
                 for changed_method in changed_methods:
                     ngrams = self.extract_n_grams(changed_method["tokens"])
                     # update the inverted index of elastic search
-                    print(ngrams)
+                    for ngram in ngrams:
+                        es_data = {
+                            "_index": "test",
+                            "doc_as_upsert": True,
+                            "doc": {
+                                "ownername": self.ownername,
+                                "reponame": self.reponame,
+                                "commit_sha": commit.id.decode(),
+                                "filepath": changed_method[
+                                    "filepath"
+                                ].decode(),
+                                "start_line": changed_method["start"],
+                                "end_line": changed_method["end"],
+                                "gram": ngram,
+                            },
+                        }
+                        es_data_bulk.append(es_data)
+                        if len(es_data_bulk) == 10:
+                            insert_es_bulk(self.es_client, es_data_bulk)
+                            del es_data_bulk[0 : len(es_data_bulk)]
             print("pause")
 
 
