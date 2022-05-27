@@ -44,6 +44,9 @@ class HandleRepository(object):
         else:
             self.repo_id = self.repo_id["id"]
         self.es_utils = ESUtils(self.config["elasticsearch"]["urls"])
+        self.handled_commits = self.es_utils.get_handled_commits(
+            repo_id=self.repo_id
+        )
 
     def handle_tree_change(self, tree_change: TreeChange):
         """
