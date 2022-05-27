@@ -11,16 +11,39 @@ from dulwich.diff_tree import TreeChange
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
-from utils import connect_es, insert_es_bulk, read_config
+from ESUtils import ESUtils
+from MySQLUtils import MySQLUtils
+from utils import read_config
 
 
 class HandleRepository(object):
     def __init__(self, repository_path, config) -> None:
+        self.config = config
         self.repository_path = repository_path
         self.repo = Repo(self.repository_path)
         self.ownername = self.repo.path.split("/")[-2]
         self.reponame = self.repo.path.split("/")[-1].split(".")[0]
-        self.es_client = connect_es(config=config)
+        self.mysql_utils = MySQLUtils(
+            host=self.config["mysql"]["host"],
+            port=self.config["mysql"]["port"],
+            username=self.config["mysql"]["username"],
+            password=self.config["mysql"]["password"],
+            database=self.config["mysql"]["database"],
+            autocommit=False,
+            dictcursor=True,
+        )
+        self.repo_id = self.mysql_utils.get_repo_id(
+            self.ownername, self.reponame
+        )
+        if self.repo_id is None:
+            raise Exception(
+                "HandleRepository Error: cannot find the id of repository: {repository_path}".format(
+                    repository_path=self.repository_path
+                )
+            )
+        else:
+            self.repo_id = self.repo_id["id"]
+        self.es_utils = ESUtils(self.config["elasticsearch"]["urls"])
 
     def handle_tree_change(self, tree_change: TreeChange):
         """
@@ -104,6 +127,7 @@ class HandleRepository(object):
         es_data_bulk = []  # store the actions of elasticsearch
 
         for commit in commits:
+            commit_sha = commit.id.decode()
             parents = commit.parents
             walk_entry = WalkEntry(
                 self.repo.get_walker(include=[commit.id]), commit
@@ -177,7 +201,7 @@ class HandleRepository(object):
                             "doc": {
                                 "ownername": self.ownername,
                                 "reponame": self.reponame,
-                                "commit_sha": commit.id.decode(),
+                                "commit_sha": commit_sha,
                                 "filepath": changed_method[
                                     "filepath"
                                 ].decode(),
@@ -188,8 +212,12 @@ class HandleRepository(object):
                         }
                         es_data_bulk.append(es_data)
                         if len(es_data_bulk) == 10:
-                            insert_es_bulk(self.es_client, es_data_bulk)
+                            self.es_utils.insert_es_bulk(es_data_bulk)
                             del es_data_bulk[0 : len(es_data_bulk)]
+
+            # finish handling this commit, insert into the handled_commit index in es
+            es_data = {"repo_id": self.repo_id, "commit_sha": commit_sha}
+            self.es_utils.insert_es_item(item=es_data)
             print("pause")
 
 
