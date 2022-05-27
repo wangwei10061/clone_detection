@@ -12,6 +12,7 @@ from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
 from ESUtils import ESUtils
+from iteration_utilities import deepflatten
 from MySQLUtils import MySQLUtils
 from utils import read_config
 
@@ -105,123 +106,111 @@ class HandleRepository(object):
             ngrams.append(ngram)
         return ngrams
 
+    def extract_one_file_change(self, commit_sha, path_sha, line_set):
+        es_data_bulk = []  # used to store the extracted change
+        path_sha_tuple = path_sha.split(b":")
+        filepath = path_sha_tuple[0]
+        object_sha = path_sha_tuple[1]
+        # read file content
+        content = self.repo.object_store[object_sha].data
+        # read all the methods, and line method index relationship
+        methods, line_method_dict = FuncExtractor(
+            filepath=filepath, content=content
+        ).parse_file()
+        # extract the changed methods
+        changed_method_indexes = list(
+            set([line_method_dict[line] for line in line_set])
+        )
+        changed_methods = [methods[index] for index in changed_method_indexes]
+        # for changed methods, extract N-Gram list
+        for changed_method in changed_methods:
+            ngrams = self.extract_n_grams(changed_method["tokens"])
+            # update the inverted index of elastic search
+            for ngram in ngrams:
+                es_data = {
+                    "_index": "test",
+                    "doc_as_upsert": True,
+                    "doc": {
+                        "ownername": self.ownername,
+                        "reponame": self.reponame,
+                        "commit_sha": commit_sha,
+                        "filepath": changed_method["filepath"].decode(),
+                        "start_line": changed_method["start"],
+                        "end_line": changed_method["end"],
+                        "gram": ngram,
+                    },
+                }
+                es_data_bulk.append(es_data)
+        return es_data_bulk
+
+    def handle_one_commit(self, commit: Commit):
+        es_data_bulk = []  # store the actions of elasticsearch
+        commit_sha = commit.id.decode()
+        if commit_sha in self.handled_commits:
+            return  # already handled this commit
+
+        """Generate all the changes for this commit."""
+        walk_entry = WalkEntry(
+            self.repo.get_walker(include=[commit.id]), commit
+        )
+        tree_changes = walk_entry.changes()  # get all the TreeChange objects
+        # handle each TreeChange, for parents > 1, handle each TreeChange list
+        changes = (
+            {}
+        )  # record all the changes, key: relative filepath:objsha; value: set() changed lines
+        if len(commit.parents) > 1:
+            tree_changes = list(deepflatten(tree_changes))
+        for t_change in tree_changes:
+            changed_path, changed_lines = self.handle_tree_change(t_change)
+            if changed_path is not None and changed_lines is not None:
+                changes.setdefault(
+                    changed_path + b":" + t_change.new.sha, set()
+                )
+                changes[changed_path + b":" + t_change.new.sha] = set(
+                    changes[changed_path + b":" + t_change.new.sha]
+                ).union(set(changed_lines))
+
+        """Handle all the changes."""
+        for path_sha, line_set in changes.items():
+            es_data_bulk.extend(
+                self.extract_one_file_change(commit_sha, path_sha, line_set)
+            )
+            if len(es_data_bulk) == 100:
+                self.es_utils.insert_es_bulk(es_data_bulk)
+                del es_data_bulk[0 : len(es_data_bulk)]
+
+        """Insert the remaining data in bulk."""
+        if len(es_data_bulk) > 0:
+            self.es_utils.insert_es_bulk(es_data_bulk)
+
+        """Finish handling this commit, insert into the handled_commit index in es."""
+        es_data = {"repo_id": self.repo_id, "commit_sha": commit_sha}
+        self.es_utils.insert_es_item(item=es_data)
+
     def run(self):
         """Get all the commits."""
 
-        commit_shas = []
         commits = []
 
         object_store = self.repo.object_store
         object_shas = list(iter(object_store))
         for object_sha in object_shas:
             obj = object_store[object_sha]
-            if isinstance(obj, Tag):
-                pass
-            elif isinstance(obj, Blob):
+            if (
+                isinstance(obj, Tag)
+                or isinstance(obj, Blob)
+                or isinstance(obj, Tree)
+            ):
                 pass
             elif isinstance(obj, Commit):
                 commits.append(obj)
-                commit_shas.append(object_sha)
-            elif isinstance(obj, Tree):
-                pass
             else:
-                raise Exception("error type")
+                raise Exception("HandleRepository.run Error: unknown type!")
 
-        es_data_bulk = []  # store the actions of elasticsearch
+        """Handle each commit."""
 
         for commit in commits:
-            commit_sha = commit.id.decode()
-            parents = commit.parents
-            walk_entry = WalkEntry(
-                self.repo.get_walker(include=[commit.id]), commit
-            )
-            tree_changes = (
-                walk_entry.changes()
-            )  # get all the TreeChange objects
-            # handle each TreeChange, for parents > 1, handle each TreeChange list
-            changes = (
-                {}
-            )  # record all the changes, key: relative filepath:objsha; value: set() changed lines
-            if len(parents) > 1:
-                for t_changes in tree_changes:
-                    for t_change in t_changes:
-                        changed_path, changed_lines = self.handle_tree_change(
-                            t_change
-                        )
-                        if (
-                            changed_path is not None
-                            and changed_lines is not None
-                        ):
-                            changes.setdefault(
-                                changed_path + b":" + t_change.new.sha, set()
-                            )
-                            changes[
-                                changed_path + b":" + t_change.new.sha
-                            ] = set(
-                                changes[changed_path + ":" + t_change.new.sha]
-                            ).union(
-                                set(changed_lines)
-                            )
-            else:
-                for t_change in tree_changes:
-                    changed_path, changed_lines = self.handle_tree_change(
-                        t_change
-                    )
-                    if changed_path is not None and changed_lines is not None:
-                        changes.setdefault(
-                            changed_path + b":" + t_change.new.sha, set()
-                        )
-                        changes[changed_path + b":" + t_change.new.sha] = set(
-                            changes[changed_path + b":" + t_change.new.sha]
-                        ).union(set(changed_lines))
-
-            # handle all the changes
-            for path_sha, line_set in changes.items():
-                path_sha_tuple = path_sha.split(b":")
-                filepath = path_sha_tuple[0]
-                object_sha = path_sha_tuple[1]
-                # read file content
-                content = self.repo.object_store[object_sha].data
-                # read all the methods, and line method index relationship
-                methods, line_method_dict = FuncExtractor(
-                    filepath=filepath, content=content
-                ).parse_file()
-                # extract the changed methods
-                changed_method_indexes = list(
-                    set([line_method_dict[line] for line in line_set])
-                )
-                changed_methods = [
-                    methods[index] for index in changed_method_indexes
-                ]
-                # for changed methods, extract N-Gram list
-                for changed_method in changed_methods:
-                    ngrams = self.extract_n_grams(changed_method["tokens"])
-                    # update the inverted index of elastic search
-                    for ngram in ngrams:
-                        es_data = {
-                            "_index": "test",
-                            "doc_as_upsert": True,
-                            "doc": {
-                                "ownername": self.ownername,
-                                "reponame": self.reponame,
-                                "commit_sha": commit_sha,
-                                "filepath": changed_method[
-                                    "filepath"
-                                ].decode(),
-                                "start_line": changed_method["start"],
-                                "end_line": changed_method["end"],
-                                "gram": ngram,
-                            },
-                        }
-                        es_data_bulk.append(es_data)
-                        if len(es_data_bulk) == 10:
-                            self.es_utils.insert_es_bulk(es_data_bulk)
-                            del es_data_bulk[0 : len(es_data_bulk)]
-
-            # finish handling this commit, insert into the handled_commit index in es
-            es_data = {"repo_id": self.repo_id, "commit_sha": commit_sha}
-            self.es_utils.insert_es_item(item=es_data)
-            print("pause")
+            self.handle_one_commit(commit)
 
 
 def handle_repositories(repositories_path: str, config: dict):

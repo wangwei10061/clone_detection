@@ -4,3 +4,4 @@ pre-commit==2.19.0
 antlr4-python3-runtime==4.10
 elasticsearch==8.2.0
 PyMySQL==1.0.2
+iteration-utilities==0.11.0
