@@ -34,16 +34,17 @@ class FuncExtractor(JavaParserListener):
             and token.type != JavaLexer.LBRACK
             and token.type != JavaLexer.RBRACK
         ]
-        self.methods.append(
-            {
-                "filepath": self.filepath,
-                "start": start_line,
-                "end": end_line,
-                "tokens": tokens,
-            }
-        )
-        for i in range(start_line, end_line + 1):
-            self.line_method_dict[i] = len(self.methods) - 1
+        if len(tokens) >= 50 and (end_line - start_line + 1 >= 6):
+            self.methods.append(
+                {
+                    "filepath": self.filepath,
+                    "start": start_line,
+                    "end": end_line,
+                    "tokens": tokens,
+                }
+            )
+            for i in range(start_line, end_line + 1):
+                self.line_method_dict[i] = len(self.methods) - 1
 
     def parse_file(self):
         """
