@@ -4,12 +4,13 @@
 
 import os
 
-from ChangedFuncExtractor import ChangedFuncExtractor
 from dulwich.diff_tree import tree_changes
 from dulwich.repo import Repo
 from flask import Flask, request
 from MySQLUtils import MySQLUtils
 from utils import read_config
+
+from services.ChangedMethodExtractor import ChangedMethodExtractor
 
 app = Flask(__name__)
 
@@ -47,24 +48,24 @@ class HandlePR(object):
         base_repo_info = self.mysql_utils.get_repo_info(
             repo_id=self.base_repo_id
         )
-        base_repo_ownername = base_repo_info["owner_name"]
-        base_repo_reponame = base_repo_info["name"]
+        self.base_repo_ownername = base_repo_info["owner_name"]
+        self.base_repo_reponame = base_repo_info["name"]
         self.base_repo_path = os.path.join(
             self.config["gitea"]["repositories_path"],
-            base_repo_ownername,
-            base_repo_reponame + ".git",
+            self.base_repo_ownername,
+            self.base_repo_reponame + ".git",
         )
         self.base_repo = Repo(self.base_repo_path)
 
         head_repo_info = self.mysql_utils.get_repo_info(
             repo_id=self.head_repo_id
         )
-        head_repo_ownername = head_repo_info["owner_name"]
-        head_repo_reponame = head_repo_info["name"]
+        self.head_repo_ownername = head_repo_info["owner_name"]
+        self.head_repo_reponame = head_repo_info["name"]
         self.head_repo_path = os.path.join(
             self.config["gitea"]["repositories_path"],
-            head_repo_ownername,
-            head_repo_reponame + ".git",
+            self.head_repo_ownername,
+            self.head_repo_reponame + ".git",
         )
         self.head_repo = Repo(self.head_repo_path)
 
@@ -98,11 +99,14 @@ class HandlePR(object):
                 ].tree,
             )
 
-        changed_funcs = []
-        for t_change in t_changes:
-            changed_funcs.extend(
-                ChangedFuncExtractor(t_change, self.config).parse()
-            )
+        changed_funcs = ChangedMethodExtractor(
+            repo=self.head_repo,
+            ownername=self.head_repo_ownername,
+            reponame=self.head_repo_ownername,
+            commit_sha=self.head_commit_sha,
+            t_changes=t_changes,
+            config=self.config,
+        ).parse()
         return changed_funcs
 
     def parse(self):

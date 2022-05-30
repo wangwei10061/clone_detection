@@ -8,7 +8,20 @@ from utils import is_file_supported
 
 
 class FuncExtractor(JavaParserListener):
-    def __init__(self, filepath, content, config):
+    def __init__(
+        self,
+        repo_id,
+        ownername,
+        reponame,
+        commit_sha,
+        filepath,
+        content,
+        config,
+    ):
+        self.repo_id = (repo_id,)
+        self.ownername = (ownername,)
+        self.reponame = (reponame,)
+        self.commit_sha = commit_sha
         self.filepath = filepath
         self.content = content
         self.config = config
@@ -42,6 +55,10 @@ class FuncExtractor(JavaParserListener):
         ):
             self.methods.append(
                 Method(
+                    repo_id=self.repo_id,
+                    ownername=self.ownername,
+                    reponame=self.reponame,
+                    commit_sha=self.commit_sha,
                     filepath=self.filepath,
                     start=start_line,
                     end=end_line,

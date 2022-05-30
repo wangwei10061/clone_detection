@@ -4,7 +4,21 @@
 
 
 class Method(object):
-    def __init__(self, filepath: bytes, start: int, end: int, tokens: list):
+    def __init__(
+        self,
+        repo_id: int,
+        ownername: str,
+        reponame: str,
+        commit_sha: str,
+        filepath: bytes,
+        start: int,
+        end: int,
+        tokens: list,
+    ):
+        self.repo_id = repo_id
+        self.ownername = ownername
+        self.reponame = reponame
+        self.commit_sha = commit_sha
         self.filepath = filepath
         self.start = start
         self.end = end

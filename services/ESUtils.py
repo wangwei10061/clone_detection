@@ -2,14 +2,16 @@
 # author: zhangxunhui
 # date: 2022-05-27
 
+from typing import List
+
 from elasticsearch import Elasticsearch, helpers
+from Method import Method
 
 
 class ESUtils(object):
-    def __init__(self, urls: list):
-        if type(urls) != list:
-            raise Exception("ESUtils Error: urls configuration wrong!")
-        self.urls = urls
+    def __init__(self, config):
+        self.config = config
+        self.urls = self.config["elasticsearch"]["urls"]
         self.client = self.connect()
 
     def connect(self):
@@ -42,3 +44,33 @@ class ESUtils(object):
                 scroll_id = page.body["_scroll_id"]
                 hits = page["hits"]["hits"]
             return list(handled_commits)
+
+    def extract_n_grams(self, tokens: list, n=5):
+        ngrams = []
+        for i in range(0, len(tokens) - n + 1):
+            ngram = (" ".join(tokens[i : i + n])).lower()
+            ngrams.append(ngram)
+        return ngrams
+
+    def extract_es_infos(self, changed_methods: List[Method]):
+        es_data_bulk = []  # used to store the extracted change
+        # for changed methods, extract N-Gram list
+        for changed_method in changed_methods:
+            ngrams = self.extract_n_grams(changed_method.tokens)
+            # update the inverted index of elastic search
+            for ngram in ngrams:
+                es_data = {
+                    "_index": self.config["elasticsearch"]["index_ngram"],
+                    "doc_as_upsert": True,
+                    "doc": {
+                        "ownername": changed_method.ownername,
+                        "reponame": changed_method.reponame,
+                        "commit_sha": changed_method.commit_sha,
+                        "filepath": changed_method.filepath.decode(),
+                        "start_line": changed_method.start,
+                        "end_line": changed_method.end,
+                        "gram": ngram,
+                    },
+                }
+                es_data_bulk.append(es_data)
+        return es_data_bulk
