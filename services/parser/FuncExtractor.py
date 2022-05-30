@@ -3,6 +3,7 @@ from parser.java.JavaParser import JavaParser
 from parser.java.JavaParserListener import JavaParserListener
 
 from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
+from Method import Method
 from utils import is_file_supported
 
 
@@ -40,12 +41,12 @@ class FuncExtractor(JavaParserListener):
             end_line - start_line + 1 >= self.config["service"]["mil"]
         ):
             self.methods.append(
-                {
-                    "filepath": self.filepath,
-                    "start": start_line,
-                    "end": end_line,
-                    "tokens": tokens,
-                }
+                Method(
+                    filepath=self.filepath,
+                    start=start_line,
+                    end=end_line,
+                    tokens=tokens,
+                )
             )
             for i in range(start_line, end_line + 1):
                 self.line_method_dict[i] = len(self.methods) - 1
