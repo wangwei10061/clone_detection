@@ -20,3 +20,10 @@ def read_variable_length_bytes(readF):
     while len(result) == 0 or result[-1] & 0x80:
         result.append(readF(1)[0])
     return result
+
+
+def is_file_supported(filepath: str, lang_suffix: list):
+    for suffix in lang_suffix:
+        if filepath.endswith(suffix):
+            return True
+    return False

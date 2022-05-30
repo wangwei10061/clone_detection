@@ -58,3 +58,8 @@ class MySQLUtils(object):
         )
         repo_id = self.cur.fetchone()
         return repo_id
+
+    def get_repo_info(self, repo_id: int):
+        self.cur.execute("select * from repository where id=%s", (repo_id,))
+        info = self.cur.fetchone()
+        return info

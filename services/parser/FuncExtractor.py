@@ -3,12 +3,14 @@ from parser.java.JavaParser import JavaParser
 from parser.java.JavaParserListener import JavaParserListener
 
 from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
+from utils import is_file_supported
 
 
 class FuncExtractor(JavaParserListener):
-    def __init__(self, filepath, content):
+    def __init__(self, filepath, content, config):
         self.filepath = filepath
         self.content = content
+        self.config = config
         self.methods = []  # used to store the methods in the file
         self.line_method_dict = (
             {}
@@ -34,7 +36,9 @@ class FuncExtractor(JavaParserListener):
             and token.type != JavaLexer.LBRACK
             and token.type != JavaLexer.RBRACK
         ]
-        if len(tokens) >= 50 and (end_line - start_line + 1 >= 6):
+        if len(tokens) >= self.config["service"]["mit"] and (
+            end_line - start_line + 1 >= self.config["service"]["mil"]
+        ):
             self.methods.append(
                 {
                     "filepath": self.filepath,
@@ -52,24 +56,18 @@ class FuncExtractor(JavaParserListener):
         return:
             - List of dict {filepath, start, end, tokens}
         """
-        if self.filepath.endswith(b".java"):
-            input = InputStream(self.content.decode())
-            lexer = JavaLexer(input)
-            tokens_stream = CommonTokenStream(lexer)
-            self.tokens = tokens_stream.tokens
-            parser = JavaParser(tokens_stream)
-            tree = parser.compilationUnit()
-            walker = ParseTreeWalker()
-            walker.walk(self, tree)
+        if is_file_supported(
+            self.filepath.decode(), self.config["service"]["lang_suffix"]
+        ):
+            if self.filepath.endswith(b".java"):
+                input = InputStream(self.content.decode())
+                lexer = JavaLexer(input)
+                tokens_stream = CommonTokenStream(lexer)
+                self.tokens = tokens_stream.tokens
+                parser = JavaParser(tokens_stream)
+                tree = parser.compilationUnit()
+                walker = ParseTreeWalker()
+                walker.walk(self, tree)
         else:
             pass  # Currently do not support other programming languages
         return self.methods, self.line_method_dict
-
-
-if __name__ == "__main__":
-    # test
-    func_extractor = FuncExtractor(
-        filepath="/home/zxh/programs/test/apache/ozone/hadoop-ozone/tools/src/main/java/org/apache/hadoop/ozone/admin/scm/FinalizationScmStatusSubcommand.java"
-    )
-    methods = func_extractor.parse_file()
-    print(methods)
