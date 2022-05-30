@@ -420,7 +420,7 @@ class HandleRepository(object):
             )
 
         """Extract the changed functions in new file."""
-        for key_new, changed_lines_old in changes_new.items():
+        for key_new, changed_lines_new in changes_new.items():
             if key_new in handled_key_new:
                 continue  # already handled when handling the related old file
             changed_methods.extend(
