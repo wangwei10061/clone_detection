@@ -46,6 +46,9 @@ class FuncExtractor(JavaParserListener):
             and token.type != JavaLexer.RBRACE
             and token.type != JavaLexer.LBRACK
             and token.type != JavaLexer.RBRACK
+            and token.type != JavaLexer.COMMA
+            and token.type != JavaLexer.SEMI
+            and token.type != JavaLexer.DOT
         ]
         if len(tokens) >= self.config["service"]["mit"] and (
             end_line - start_line + 1 >= self.config["service"]["mil"]

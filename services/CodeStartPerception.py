@@ -17,7 +17,7 @@ from utils import read_config
 
 
 class HandleRepository(object):
-    def __init__(self, repoInfo: RepoInfo, config: dict):
+    def __init__(self, repoInfo: RepoInfo, config: dict, es_utils: ESUtils):
         self.config = config
         self.repoInfo = repoInfo
         self.repo = Repo(self.repoInfo.repo_path)
@@ -43,7 +43,7 @@ class HandleRepository(object):
             )
         else:
             self.repoInfo.repo_id = repo_id["id"]
-        self.es_utils = ESUtils(config=self.config)
+        self.es_utils = es_utils
         self.handled_commits = self.es_utils.get_handled_commits(
             repo_id=self.repoInfo.repo_id,
             index_name=self.config["elasticsearch"]["index_handled_commits"],
@@ -138,6 +138,10 @@ class HandleCommit(object):
 def handle_repositories(repositories_path: str, config: dict):
     """Handle all the repositories in the directory."""
 
+    es_utils = ESUtils(config=config)
+    es_utils.create_n_gram_index()
+    es_utils.create_handled_commit_index()
+
     # iterate all the ownernames
     ownername_paths = [
         f.path for f in os.scandir(repositories_path) if f.is_dir()
@@ -152,7 +156,9 @@ def handle_repositories(repositories_path: str, config: dict):
                 continue  # only for test
             # handle one repository
             handler = HandleRepository(
-                repoInfo=RepoInfo(repo_path=repo_git_path), config=config
+                repoInfo=RepoInfo(repo_path=repo_git_path),
+                config=config,
+                es_utils=es_utils,
             )
             handler.run()
 

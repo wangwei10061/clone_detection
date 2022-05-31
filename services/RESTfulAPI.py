@@ -4,13 +4,14 @@
 
 import os
 
+from ChangedMethodExtractor import ChangedMethodExtractor
+from CloneDetection import CloneDetection
 from dulwich.diff_tree import tree_changes
 from dulwich.repo import Repo
 from flask import Flask, request
+from models.RepoInfo import RepoInfo
 from MySQLUtils import MySQLUtils
 from utils import read_config
-
-from services.ChangedMethodExtractor import ChangedMethodExtractor
 
 app = Flask(__name__)
 
@@ -45,31 +46,39 @@ class HandlePR(object):
         )
 
         """Query mysql for owner_name and name of repository."""
-        base_repo_info = self.mysql_utils.get_repo_info(
-            repo_id=self.base_repo_id
-        )
-        self.base_repo_ownername = base_repo_info["owner_name"]
-        self.base_repo_reponame = base_repo_info["name"]
-        self.base_repo_path = os.path.join(
+        base_repo_info = self.mysql_utils.get_repo_info(repo_id=base_repo_id)
+        base_repo_ownername = base_repo_info["owner_name"]
+        base_repo_reponame = base_repo_info["name"]
+        base_repo_path = os.path.join(
             self.config["gitea"]["repositories_path"],
-            self.base_repo_ownername,
-            self.base_repo_reponame + ".git",
+            base_repo_ownername,
+            base_repo_reponame + ".git",
         )
-        self.base_repo = Repo(self.base_repo_path)
+        self.baseRepoInfo = RepoInfo(
+            repo_id=base_repo_id,
+            ownername=base_repo_ownername,
+            reponame=base_repo_reponame,
+            repo_path=base_repo_path,
+        )
+        self.base_repo = Repo(self.baseRepoInfo.repo_path)
 
-        head_repo_info = self.mysql_utils.get_repo_info(
-            repo_id=self.head_repo_id
-        )
-        self.head_repo_ownername = head_repo_info["owner_name"]
-        self.head_repo_reponame = head_repo_info["name"]
-        self.head_repo_path = os.path.join(
+        head_repo_info = self.mysql_utils.get_repo_info(repo_id=head_repo_id)
+        head_repo_ownername = head_repo_info["owner_name"]
+        head_repo_reponame = head_repo_info["name"]
+        head_repo_path = os.path.join(
             self.config["gitea"]["repositories_path"],
-            self.head_repo_ownername,
-            self.head_repo_reponame + ".git",
+            head_repo_ownername,
+            head_repo_reponame + ".git",
         )
-        self.head_repo = Repo(self.head_repo_path)
+        self.headRepoInfo = RepoInfo(
+            repo_id=head_repo_id,
+            ownername=head_repo_ownername,
+            reponame=head_repo_reponame,
+            repo_path=head_repo_path,
+        )
+        self.head_repo = Repo(self.headRepoInfo.repo_path)
 
-    def extract_changed_funcs(self):
+    def extract_changed_methods(self):
 
         """Compare the diff between head_commit_sha and base_commit_sha.
         There are two cases:
@@ -99,22 +108,23 @@ class HandlePR(object):
                 ].tree,
             )
 
-        changed_funcs = ChangedMethodExtractor(
+        changed_methods = ChangedMethodExtractor(
             repo=self.head_repo,
-            ownername=self.head_repo_ownername,
-            reponame=self.head_repo_ownername,
+            repoInfo=self.headRepoInfo,
             commit_sha=self.head_commit_sha,
             t_changes=t_changes,
             config=self.config,
         ).parse()
-        return changed_funcs
+        return changed_methods
 
     def parse(self):
         """Find changed functions."""
-        changed_funcs = self.extract_changed_funcs()
+        changed_methods = self.extract_changed_methods()
         """Do the clone detection."""
-        for changed_func in changed_funcs:
-            print("pause")
+        result = CloneDetection(
+            methods=changed_methods, config=self.config
+        ).run()
+        print(result)
 
 
 @app.route("/clone_detection", methods=["POST"])
@@ -126,7 +136,7 @@ def clone_detection_api():
         or "head_commit_sha" not in data
         or "base_commit_sha" not in data
     ):
-        return "RESTful request error: repo_id or new_commit_shas or base_commit_sha parameter not found!"
+        return "RESTful request error: repo_id or head_commit_sha or base_commit_sha parameter not found!"
     else:
         base_repo_id = data["base_repo_id"]
         if type(base_repo_id) != int:
