@@ -5,7 +5,7 @@
 from typing import List
 
 from elasticsearch import Elasticsearch, helpers
-from Method import Method
+from models.MethodInfo import MethodInfo
 
 
 class ESUtils(object):
@@ -52,7 +52,7 @@ class ESUtils(object):
             ngrams.append(ngram)
         return ngrams
 
-    def extract_es_infos(self, changed_methods: List[Method]):
+    def extract_es_infos(self, changed_methods: List[MethodInfo]):
         es_data_bulk = []  # used to store the extracted change
         # for changed methods, extract N-Gram list
         for changed_method in changed_methods:

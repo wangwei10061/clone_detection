@@ -4,24 +4,25 @@
 
 import os
 import sys
-import time
+from typing import List
 
 from ChangedMethodExtractor import ChangedMethodExtractor
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import Repo
 from dulwich.walk import WalkEntry
 from ESUtils import ESUtils
+from models.RepoInfo import RepoInfo
 from MySQLUtils import MySQLUtils
 from utils import read_config
 
 
 class HandleRepository(object):
-    def __init__(self, repository_path, config):
+    def __init__(self, repoInfo: RepoInfo, config: dict):
         self.config = config
-        self.repository_path = repository_path
-        self.repo = Repo(self.repository_path)
-        self.ownername = self.repo.path.split("/")[-2]
-        self.reponame = self.repo.path.split("/")[-1].split(".")[0]
+        self.repoInfo = repoInfo
+        self.repo = Repo(self.repoInfo.repo_path)
+        self.repoInfo.ownername = self.repo.path.split("/")[-2]
+        self.repoInfo.reponame = self.repo.path.split("/")[-1].split(".")[0]
         self.mysql_utils = MySQLUtils(
             host=self.config["mysql"]["host"],
             port=self.config["mysql"]["port"],
@@ -31,33 +32,27 @@ class HandleRepository(object):
             autocommit=False,
             dictcursor=True,
         )
-        self.repo_id = self.mysql_utils.get_repo_id(
-            self.ownername, self.reponame
+        repo_id = self.mysql_utils.get_repo_id(
+            self.repoInfo.ownername, self.repoInfo.reponame
         )
-        if self.repo_id is None:
+        if repo_id is None:
             raise Exception(
                 "HandleRepository Error: cannot find the id of repository: {repository_path}".format(
                     repository_path=self.repository_path
                 )
             )
         else:
-            self.repo_id = self.repo_id["id"]
+            self.repoInfo.repo_id = repo_id["id"]
         self.es_utils = ESUtils(config=self.config)
-        read_handled_commits_start = time.time()
         self.handled_commits = self.es_utils.get_handled_commits(
-            repo_id=self.repo_id,
+            repo_id=self.repoInfo.repo_id,
             index_name=self.config["elasticsearch"]["index_handled_commits"],
         )
-        print(
-            "read handled commits time: {t}".format(
-                t=time.time() - read_handled_commits_start
-            )
-        )  # this is very slow
 
     def run(self):
         """Get all the commits."""
 
-        commits = []
+        commits: List[Commit] = []
 
         object_store = self.repo.object_store
         object_shas = list(iter(object_store))
@@ -81,9 +76,7 @@ class HandleRepository(object):
             else:
                 HandleCommit(
                     repo=self.repo,
-                    repo_id=self.repo_id,
-                    ownername=self.ownername,
-                    reponame=self.reponame,
+                    repoInfo=self.repoInfo,
                     commit=commit,
                     config=self.config,
                     es_utils=self.es_utils,
@@ -94,25 +87,25 @@ class HandleCommit(object):
     def __init__(
         self,
         repo: Repo,
-        repo_id: int,
-        ownername: str,
-        reponame: str,
+        repoInfo: RepoInfo,
         commit: Commit,
-        config,
+        config: dict,
         es_utils: ESUtils,
     ):
         self.repo = repo
-        self.repo_id = repo_id
-        self.ownername = ownername
-        self.reponame = reponame
+        self.repoInfo = repoInfo
         self.commit = commit
         self.config = config
         self.es_utils = es_utils
 
     def run(self):
         commit_sha = self.commit.id.decode()
+        print(
+            "[Info]: Handling commit {commit_sha}".format(
+                commit_sha=commit_sha
+            )
+        )
 
-        handle_one_commit_start = time.time()
         """Generate all the changes for this commit."""
         walk_entry = WalkEntry(
             self.repo.get_walker(include=[self.commit.id]), self.commit
@@ -120,16 +113,10 @@ class HandleCommit(object):
         t_changes = walk_entry.changes()  # get all the TreeChange objects
         if len(self.commit.parents) > 1:
             t_changes = [item for t_cs in t_changes for item in t_cs]
-        print(
-            "generate tree_changes: {t}".format(
-                t=time.time() - handle_one_commit_start
-            )
-        )
 
         changed_methods = ChangedMethodExtractor(
             repo=self.repo,
-            ownername=self.ownername,
-            reponame=self.reponame,
+            repoInfo=self.repoInfo,
             commit_sha=commit_sha,
             t_changes=t_changes,
             config=self.config,
@@ -141,16 +128,10 @@ class HandleCommit(object):
         self.es_utils.insert_es_bulk(es_data_bulk)
 
         """Finish handling this commit, insert into the handled_commit index in es."""
-        es_data = {"repo_id": self.repo_id, "commit_sha": commit_sha}
+        es_data = {"repo_id": self.repoInfo.repo_id, "commit_sha": commit_sha}
         self.es_utils.insert_es_item(
             item=es_data,
             index_name=self.config["elasticsearch"]["index_handled_commits"],
-        )
-
-        print(
-            "handle_one_commit: {t}".format(
-                t=time.time() - handle_one_commit_start
-            )
         )
 
 
@@ -163,15 +144,15 @@ def handle_repositories(repositories_path: str, config: dict):
     ]
     for ownername_path in ownername_paths:
         # iterate all the repositories
-        reponame_git_paths = [
+        repo_git_paths = [
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
-        for reponame_git_path in reponame_git_paths:
-            if not reponame_git_path.endswith("dubbo.git"):
+        for repo_git_path in repo_git_paths:
+            if not repo_git_path.endswith("dubbo.git"):
                 continue  # only for test
             # handle one repository
             handler = HandleRepository(
-                repository_path=reponame_git_path, config=config
+                repoInfo=RepoInfo(repo_path=repo_git_path), config=config
             )
             handler.run()
 
@@ -183,7 +164,7 @@ def main():
     config = read_config(config_path)
     if config is None:
         print(
-            "Error: configuration file {config_path} not found".format(
+            "[Error]: configuration file {config_path} not found".format(
                 config_path=config_path
             )
         )
@@ -192,7 +173,7 @@ def main():
     try:
         repositories_path = config["gitea"]["repositories_path"]
     except Exception:
-        print("Error: gitea repositories_path configration not found")
+        print("[Error]: gitea repositories_path configration not found")
         sys.exit(1)
 
     handle_repositories(repositories_path=repositories_path, config=config)

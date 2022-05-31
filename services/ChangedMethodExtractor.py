@@ -8,6 +8,8 @@ from typing import List
 
 from dulwich.diff_tree import TreeChange
 from dulwich.repo import Repo
+from models.MethodInfo import MethodInfo
+from models.RepoInfo import RepoInfo
 from utils import is_file_supported
 
 
@@ -21,21 +23,22 @@ class ChangedMethodExtractor(object):
     def __init__(
         self,
         repo: Repo,
-        ownername: str,
-        reponame: str,
+        repoInfo: RepoInfo,
         commit_sha: str,
         t_changes: List[TreeChange],
         config,
     ):
         self.repo = repo
-        self.ownername = ownername
-        self.reponame = reponame
+        self.repoInfo = repoInfo
         self.commit_sha = commit_sha
         self.t_changes = t_changes
         self.config = config
 
     def find_related_method_indexes(
-        self, old_method, old_line_relation, new_line_method_dict
+        self,
+        old_method: MethodInfo,
+        old_line_relation: dict,
+        new_line_method_dict: dict,
     ):
         start = old_method.start
         end = old_method.end
@@ -90,7 +93,9 @@ class ChangedMethodExtractor(object):
                 raise Exception("Function extract_diff Error: type error!")
         return changed_lines_new, changed_lines_old, old_line_relation
 
-    def extract_changed_funcs_4new(self, key_new, changed_lines_new):
+    def extract_changed_funcs_4new(
+        self, key_new: bytes, changed_lines_new: list
+    ):
         key_new_tuple = key_new.split(b":")
         filepath = key_new_tuple[0]
         object_sha = key_new_tuple[1]
@@ -98,9 +103,7 @@ class ChangedMethodExtractor(object):
         content = self.repo.object_store[object_sha].data
         # read all the methods, and line method index relationship
         new_methods, new_line_method_dict = FuncExtractor(
-            repo_id=self.repo,
-            ownername=self.ownername,
-            reponame=self.reponame,
+            repoInfo=self.repoInfo,
             commit_sha=self.commit_sha,
             filepath=filepath,
             content=content,
@@ -123,11 +126,11 @@ class ChangedMethodExtractor(object):
 
     def extract_changed_funcs_4old(
         self,
-        key_old,
-        key_new,
-        changed_lines_old,
-        changed_lines_new,
-        old_line_relation,
+        key_old: bytes,
+        key_new: bytes,
+        changed_lines_old: list,
+        changed_lines_new: list,
+        old_line_relation: dict,
     ):
         """Handle related new file change at the same time."""
         """Get all the methods in new path."""
@@ -136,9 +139,7 @@ class ChangedMethodExtractor(object):
         new_object_sha = key_new_tuple[1]
         new_content = self.repo.object_store[new_object_sha].data
         new_methods, new_line_method_dict = FuncExtractor(
-            repo_id=self.repo,
-            ownername=self.ownername,
-            reponame=self.reponame,
+            repoInfo=self.repoInfo,
             commit_sha=self.commit_sha,
             filepath=new_filepath,
             content=new_content,
@@ -157,9 +158,7 @@ class ChangedMethodExtractor(object):
         old_object_sha = key_old_tuple[1]
         old_content = self.repo.object_store[old_object_sha].data
         old_methods, old_line_method_dict = FuncExtractor(
-            repo_id=self.repo,
-            ownername=self.ownername,
-            reponame=self.reponame,
+            repoInfo=self.repoInfo,
             commit_sha=self.commit_sha,
             filepath=old_filepath,
             content=old_content,

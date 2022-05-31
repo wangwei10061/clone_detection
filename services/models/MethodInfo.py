@@ -3,7 +3,7 @@
 # author: zhangxunhui
 
 
-class Method(object):
+class MethodInfo(object):
     def __init__(
         self,
         repo_id: int,

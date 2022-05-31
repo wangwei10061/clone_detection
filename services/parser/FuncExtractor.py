@@ -3,24 +3,21 @@ from parser.java.JavaParser import JavaParser
 from parser.java.JavaParserListener import JavaParserListener
 
 from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
-from Method import Method
+from models.MethodInfo import MethodInfo
+from models.RepoInfo import RepoInfo
 from utils import is_file_supported
 
 
 class FuncExtractor(JavaParserListener):
     def __init__(
         self,
-        repo_id,
-        ownername,
-        reponame,
-        commit_sha,
-        filepath,
-        content,
-        config,
+        repoInfo: RepoInfo,
+        commit_sha: str,
+        filepath: str,
+        content: str,
+        config: dict,
     ):
-        self.repo_id = (repo_id,)
-        self.ownername = (ownername,)
-        self.reponame = (reponame,)
+        self.repoInfo = repoInfo
         self.commit_sha = commit_sha
         self.filepath = filepath
         self.content = content
@@ -54,10 +51,10 @@ class FuncExtractor(JavaParserListener):
             end_line - start_line + 1 >= self.config["service"]["mil"]
         ):
             self.methods.append(
-                Method(
-                    repo_id=self.repo_id,
-                    ownername=self.ownername,
-                    reponame=self.reponame,
+                MethodInfo(
+                    repo_id=self.repoInfo.repo_id,
+                    ownername=self.repoInfo.ownername,
+                    reponame=self.repoInfo.reponame,
                     commit_sha=self.commit_sha,
                     filepath=self.filepath,
                     start=start_line,
