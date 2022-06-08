@@ -3,10 +3,15 @@
 # date: 2022-06-08
 
 import json
+import os
 import threading
 
 import IncrementalPerceptionAPI as apiClass
+from CodeStartPerception import HandleCommit
+from dulwich.repo import Repo
+from ESUtils import ESUtils
 from models.CommitInfo import CommitInfo
+from models.RepoInfo import RepoInfo
 from RabbitmqUtils import RabbitmqUtils
 
 
@@ -32,7 +37,27 @@ class IncrementalPerceptionHandler(threading.Thread):
     def callback(self, ch, method, properties, body):
         task = json.loads(str(body, encoding="utf-8"))
         commitInfo = CommitInfo.dict2obj(task)
-        print(commitInfo)
+        repo_path = os.path.join(
+            apiClass.config["gitea"]["repositories_path"],
+            commitInfo.ownername,
+            commitInfo.reponame + ".git",
+        )
+        repoInfo = RepoInfo(
+            repo_path=repo_path,
+            repo_id=commitInfo.repo_id,
+            ownername=commitInfo.ownername,
+            reponame=commitInfo.reponame,
+        )
+        repo = Repo(repoInfo.repo_path)
+        commit = repo.object_store[commitInfo.sha.encode()]
+
+        HandleCommit(
+            repo=repo,
+            repoInfo=repoInfo,
+            commit=commit,
+            config=apiClass.config,
+            es_utils=ESUtils(config=apiClass.config),
+        ).run()
 
 
 if __name__ == "__main__":

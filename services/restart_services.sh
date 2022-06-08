@@ -34,4 +34,5 @@ restart_service()
 }
 
 restart_service 'CodeStartPerception'
-restart_service 'IncrementalPerception'
+restart_service 'IncrementalPerceptionAPI'
+restart_service 'IncrementalPerceptionHandler'
