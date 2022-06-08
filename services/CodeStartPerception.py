@@ -69,6 +69,37 @@ class HandleRepository(object):
             else:
                 raise Exception("HandleRepository.run Error: unknown type!")
 
+        """Whether this repository is forked or original"""
+        info = self.mysql_utils.get_repo_info(repo_id=self.repoInfo.repo_id)
+        is_fork = False
+        if info is not None and info["is_fork"] == 1:
+            is_fork = True
+        if is_fork:
+            # eliminate the forked commits
+            fork_id = info["fork_id"]
+            origin_info = self.mysql_utils.get_repo_info(repo_id=fork_id)
+            if origin_info is not None:
+                origin_ownername = origin_info["owner_name"]
+                origin_reponame = origin_info["name"]
+                origin_repo_path = os.path.join(
+                    self.config["gitea"]["repositories_path"],
+                    origin_ownername,
+                    origin_reponame + ".git",
+                )
+                origin_repo = Repo(origin_repo_path)
+                origin_commits: List[Commit] = []
+                origin_object_store = origin_repo.object_store
+                origin_object_shas = list(iter(origin_object_store))
+                for object_sha in origin_object_shas:
+                    obj = origin_object_store[object_sha]
+                    if isinstance(obj, Commit):
+                        origin_commits.append(obj)
+                commits = list(set(commits) - set(origin_commits))
+            else:
+                pass  # origin repo not found in gitea mysql database
+        else:
+            pass  # not a fork repo
+
         """Handle each commit."""
         for commit in commits:
             if commit.id.decode() in self.handled_commits:
@@ -152,8 +183,8 @@ def handle_repositories(repositories_path: str, config: dict):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for repo_git_path in repo_git_paths:
-            if not repo_git_path.endswith("dubbo.git"):
-                continue  # only for test
+            # if "zhangxunhui-outlook" not in repo_git_path:
+            #     continue  # only for test
             # handle one repository
             handler = HandleRepository(
                 repoInfo=RepoInfo(repo_path=repo_git_path),
