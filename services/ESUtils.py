@@ -138,7 +138,7 @@ class ESUtils(object):
         es_data_bulk = []  # used to store the extracted change
         # for changed methods, extract N-Gram list
         for changed_method in changed_methods:
-            ngrams = self.concat_tokens(changed_method.tokens)
+            code = self.special_connector.join(changed_method.tokens).lower()
             # update the inverted index of elastic search
             es_data = {
                 "_index": self.config["elasticsearch"]["index_ngram"],
@@ -148,7 +148,7 @@ class ESUtils(object):
                     "filepath": changed_method.filepath.decode(),
                     "start_line": changed_method.start,
                     "end_line": changed_method.end,
-                    "code": ngrams,
+                    "code": code,
                 },
             }
             es_data_bulk.append(es_data)
