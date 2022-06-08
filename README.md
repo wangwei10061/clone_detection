@@ -23,10 +23,21 @@ docker ps # test whether docker command can be used
     - `sudo chmod 777 -R dependencies/kibana`
     - `docker-compose up -d`
 4. Configure the gitea settings for initialization. See the figure below.
+
 <details>
   <summary>Click to present.</summary>
 
   You need to change the IP address and the administrator account by yourself.
 
   ![image](pics/gitea-setting.jpeg)
+</details>
+
+5. Configure the gitea system webhook for the incremental perception service. See the figure below.
+
+<details>
+  <summary>Click to present.</summary>
+
+  You need to change the IP address and the administrator account by yourself.
+
+  ![image](pics/gitea-system-webhook-setting.png)
 </details>
