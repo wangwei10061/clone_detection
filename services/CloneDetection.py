@@ -3,7 +3,6 @@
 # author: zhangxunhui
 
 from ESUtils import ESUtils
-from models.MethodInfo import MethodInfo
 
 
 class CloneDetection(object):

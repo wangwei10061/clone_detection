@@ -15,3 +15,12 @@ class CommitInfo(QueueTaskInfo):
         self.ownername = ownername
         self.reponame = reponame
         self.sha = sha
+
+    @staticmethod
+    def dict2obj(d):
+        return CommitInfo(
+            repo_id=d["repo_id"],
+            ownername=d["ownername"],
+            reponame=d["reponame"],
+            sha=d["sha"],
+        )
