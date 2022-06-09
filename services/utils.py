@@ -27,3 +27,10 @@ def is_file_supported(filepath: str, lang_suffix: list):
         if filepath.endswith(suffix):
             return True
     return False
+
+
+def extract_n_grams(tokens: str, ngramSize: int):
+    ngrams = []
+    for i in range(len(tokens) - ngramSize + 1):
+        ngrams.append(" ".join(tokens[i : i + ngramSize]))
+    return ngrams

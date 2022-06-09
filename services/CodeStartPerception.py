@@ -224,7 +224,7 @@ def handle_repositories(repositories_path: str, config: dict):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for repo_git_path in repo_git_paths:
-            if "dubbo.git" not in repo_git_path:
+            if "test1.git" not in repo_git_path:
                 continue  # only for test
             # handle one repository
             handler = HandleRepository(

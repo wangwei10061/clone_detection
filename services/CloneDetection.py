@@ -6,7 +6,9 @@ import json
 from typing import List
 
 from ESUtils import ESUtils
+from LCS import LCS
 from models.MethodInfo import MethodInfo
+from utils import extract_n_grams
 
 
 class CloneDetection(object):
@@ -15,37 +17,44 @@ class CloneDetection(object):
         self.config = config
         self.es_utils = ESUtils(config=self.config)
 
-    def locationPhase(self):
-        """NIL location phase.
-        Use Elasticsearch's search engine instead
-        """
-        pass
-
     def filterPhase(self, method: MethodInfo, candidates: List[dict]):
         """NIL filter phase.
         common distinct n-grams * 100 / min(distinct n-grams) >= 10%
         """
-        method_n_grams = {}
-        for i in range(
-            0, len(method.tokens) - self.config["service"]["ngram"] + 1
-        ):
-            ngram = (
-                self.config["service"]["ngram_connector"].join(
-                    method.tokens[i : i + self.config["service"]["ngram"]]
-                )
-            ).lower()
-            method_n_grams.setdefault(ngram, 0)
-            method_n_grams[ngram] += 1
+        if method.ngrams is None:
+            method.ngrams = extract_n_grams(
+                tokens=" ".join(method.tokens).split(" "),
+                ngramSize=self.config["service"]["ngram"],
+            )
 
         def _filter(candidate):
-            # 转换为dict存储ngram
-            print("pause")
-            pass
+            candidate_ngrams = extract_n_grams(
+                tokens=candidate["code"].split(" "),
+                ngramSize=self.config["service"]["ngram"],
+            )
+            minV = min(len(set(method.ngrams)), len(set(candidate_ngrams)))
+            # return len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV >= self.config['service']['filter_threshold']
+            return (
+                len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
+                >= 1
+            )
 
-        return filter(_filter, candidates)
+        return list(filter(_filter, candidates))
 
-    def verificationPhase(self):
-        pass
+    def verificationPhase(self, method: MethodInfo, candidates: List[dict]):
+        """NIL verify phase.
+        lcs.calcLength(tokenSequence1, tokenSequence2) * 100 / min >= 70%
+        """
+        X = " ".join(method.tokens).split(" ")
+        result = []
+        for candidate in candidates:
+            Y = candidate["code"].split(" ")
+            minV = min(len(X), len(Y))
+            sim = LCS().lcs(X, Y, len(X), len(Y)) * 100 / minV
+            if sim >= self.config["service"]["verify_threshold"]:
+                candidate["similarity"] = sim
+                result.append(candidate)
+        return result
 
     def run(self):
         result = (
@@ -62,7 +71,7 @@ class CloneDetection(object):
 
             # 1. location phase
             search_results = self.es_utils.search_method_filter(
-                search_string=" ".join(method.tokens).lower(),
+                search_string=" ".join(method.tokens),
                 repo_id=method.repo_id,
                 filepath=method.filepath.decode(),
             )
@@ -72,20 +81,29 @@ class CloneDetection(object):
                 result.setdefault(method_str, [])
                 result[method_str].append(
                     {
-                        "commit_sha": search_result["_source"]["doc"][
-                            "commit_sha"
-                        ],
-                        "repo_id": search_result["_source"]["doc"]["repo_id"],
-                        "filepath": search_result["_source"]["doc"][
-                            "filepath"
-                        ],
-                        "start": search_result["_source"]["doc"]["start_line"],
-                        "end": search_result["_source"]["doc"]["end_line"],
+                        "commit_sha": search_result["_source"]["commit_sha"],
+                        "repo_id": search_result["_source"]["repo_id"],
+                        "filepath": search_result["_source"]["filepath"],
+                        "start": search_result["_source"]["start_line"],
+                        "end": search_result["_source"]["end_line"],
+                        "code_ngrams": search_result["_source"]["code_ngrams"],
+                        "code": search_result["_source"]["code"],
                     }
                 )
 
             # 2. filter phase
-            self.filterPhase(method=method, candidates=search_results)
+            result[method_str] = self.filterPhase(
+                method=method, candidates=result[method_str]
+            )
+
+            # 3. verify phase
+            result[method_str] = self.verificationPhase(
+                method=method, candidates=result[method_str]
+            )
+
+            # 4. 对得到的结果进行排序，选择时间最早的一个
+            print("pause")
+
         return result
 
 

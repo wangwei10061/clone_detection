@@ -44,43 +44,34 @@ class ESUtils(object):
                                     "max_shingle_size": self.config["service"][
                                         "ngram"
                                     ],
-                                    "output_unigrams": False,
-                                }
-                            },
-                            "tokenizer": {
-                                "special_tokenizer": {
-                                    "type": "simple_pattern_split",
-                                    "pattern": self.config["service"][
-                                        "ngram_connector"
-                                    ],
+                                    "output_unigrams": "false",
                                 }
                             },
                             "analyzer": {
-                                "my_analyzer": {
-                                    "filter": ["my_shingle_filter"],
+                                "shingle_analyzer": {
+                                    "filter": [
+                                        "lowercase",
+                                        "my_shingle_filter",
+                                    ],
                                     "type": "custom",
-                                    "tokenizer": "special_tokenizer",
+                                    "tokenizer": "whitespace",
                                 }
                             },
                         }
                     },
                     "mappings": {
                         "properties": {
-                            "repo_id": {
-                                "index": True,
-                                "type": "keyword",
-                            },
-                            "commit_sha": {"index": True, "type": "keyword"},
-                            "filepath": {"index": True, "type": "keyword"},
-                            "start_line": {"index": True, "type": "keyword"},
-                            "end_line": {"index": True, "type": "keyword"},
-                            "code": {"index": False, "type": "keyword"},
+                            "repo_id": {"type": "integer"},
+                            "commit_sha": {"type": "keyword"},
+                            "filepath": {"type": "keyword"},
+                            "start_line": {"type": "integer"},
+                            "end_line": {"type": "integer"},
                             "code_ngrams": {
-                                "index": True,
                                 "type": "text",
-                                "analyzer": "my_analyzer",
-                                "search_analyzer": "my_analyzer",
+                                "analyzer": "shingle_analyzer",
+                                "search_analyzer": "shingle_analyzer",
                             },
+                            "code": {"index": False, "type": "text"},
                         }
                     },
                 },
@@ -97,11 +88,8 @@ class ESUtils(object):
                 body={
                     "mappings": {
                         "properties": {
-                            "repo_id": {
-                                "index": True,
-                                "type": "keyword",
-                            },
-                            "commit_sha": {"index": True, "type": "keyword"},
+                            "repo_id": {"type": "keyword"},
+                            "commit_sha": {"type": "keyword"},
                         }
                     }
                 },
@@ -135,37 +123,27 @@ class ESUtils(object):
             return list(handled_commits)
 
     def extract_es_infos(self, changed_methods: List[MethodInfo]):
-        es_data_bulk = []  # used to store the extracted change
+        actions = []  # used to store the extracted change
         # for changed methods, extract N-Gram list
         for changed_method in changed_methods:
-            code = (
-                self.config["service"]["ngram_connector"]
-                .join(changed_method.tokens)
-                .lower()
-            )
+            code = " ".join(changed_method.tokens)
             # update the inverted index of elastic search
-            es_data = {
+            action = {
+                "_op_type": "create",
                 "_index": self.config["elasticsearch"]["index_ngram"],
-                "doc": {
-                    "repo_id": changed_method.repo_id,
-                    "commit_sha": changed_method.commit_sha,
-                    "filepath": changed_method.filepath.decode(),
-                    "start_line": changed_method.start,
-                    "end_line": changed_method.end,
-                    "code_ngrams": code,
-                    "code": code,
-                },
+                "repo_id": changed_method.repo_id,
+                "commit_sha": changed_method.commit_sha,
+                "filepath": changed_method.filepath.decode(),
+                "start_line": changed_method.start,
+                "end_line": changed_method.end,
+                "code_ngrams": code,
+                "code": code,
             }
-            es_data_bulk.append(es_data)
-        return es_data_bulk
-
-    def location(self, n_grams: List[str]):
-        pass
+            actions.append(action)
+        return actions
 
     def search_method(self, search_string: str):
-        body = {
-            "query": {"match": {"doc.code_ngrams": {"query": search_string}}}
-        }
+        body = {"query": {"match": {"code_ngrams": {"query": search_string}}}}
         data = self.client.search(
             index=self.config["elasticsearch"]["index_ngram"], body=body
         )
@@ -178,11 +156,11 @@ class ESUtils(object):
             "query": {
                 "bool": {
                     "must": {
-                        "match": {"doc.code_ngrams": {"query": search_string}}
+                        "match": {"code_ngrams": {"query": search_string}}
                     },
                     "must_not": [
-                        {"match": {"doc.repo_id": repo_id}},
-                        {"match": {"doc.filepath": filepath}},
+                        {"match": {"repo_id": repo_id}},
+                        {"match": {"filepath": filepath}},
                     ],
                 }
             }
