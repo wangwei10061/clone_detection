@@ -2,6 +2,7 @@
 # date: 2022-05-28
 # author: zhangxunhui
 
+import json
 import os
 
 from ChangedMethodExtractor import ChangedMethodExtractor
@@ -124,7 +125,7 @@ class HandlePR(object):
         result = CloneDetection(
             methods=changed_methods, config=self.config
         ).run()
-        print(result)
+        return result
 
 
 @app.route("/clone_detection", methods=["POST"])
@@ -154,17 +155,14 @@ def clone_detection_api():
         if type(base_commit_sha) != str:
             return "RESTful request error: old commit sha should be a string!"
 
-        HandlePR(
+        result = HandlePR(
             base_repo_id=base_repo_id,
             head_repo_id=head_repo_id,
             base_commit_sha=base_commit_sha,
             head_commit_sha=head_commit_sha,
         ).parse()
 
-        """Find changed files and related changed methods."""
-
-        """Extract the n-grams."""
-        return head_commit_sha
+        return json.dumps(result)
 
 
 if __name__ == "__main__":

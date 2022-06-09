@@ -2,6 +2,8 @@
 # date: 2022-05-30
 # author: zhangxunhui
 
+import json
+
 from ESUtils import ESUtils
 
 
@@ -25,12 +27,48 @@ class CloneDetection(object):
         pass
 
     def run(self):
+        result = (
+            {}
+        )  # key: MethodInfo, value: {commit_sha, repo_id, filepath, start, end}
         for method in self.methods:
-            result = self.es_utils.search_method(
+            method_str = json.dumps(
+                {
+                    "filepath": method.filepath.decode(),
+                    "start": method.start,
+                    "end": method.end,
+                }
+            )
+            search_results = self.es_utils.search_method(
                 search_string=" ".join(method.tokens)
             )
-            # result = self.es_utils.search_method(search_string="> invoker invocation invocation rpccontext geturl service monitorservice method method monitorservice > last = invoker list")
-            print(result)
+            # search_result = self.es_utils.search_method(search_string="> invoker invocation invocation rpccontext geturl service monitorservice method method monitorservice > last = invoker list")
+
+            # remove same file functions to avoid same function
+
+            def _not_in_same_file(searchResult: dict):
+                return not (
+                    searchResult["_source"]["doc"]["repo_id"] == method.repo_id
+                    and searchResult["_source"]["doc"]["filepath"]
+                    == method.filepath.decode()
+                )
+
+            search_results = list(filter(_not_in_same_file, search_results))
+            for search_result in search_results:
+                result.setdefault(method_str, [])
+                result[method_str].append(
+                    {
+                        "commit_sha": search_result["_source"]["doc"][
+                            "commit_sha"
+                        ],
+                        "repo_id": search_result["_source"]["doc"]["repo_id"],
+                        "filepath": search_result["_source"]["doc"][
+                            "filepath"
+                        ],
+                        "start": search_result["_source"]["doc"]["start_line"],
+                        "end": search_result["_source"]["doc"]["end_line"],
+                    }
+                )
+        return result
 
 
 if __name__ == "__main__":
