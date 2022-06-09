@@ -7,6 +7,7 @@ restart_service()
     log_name="$service_name.log"
     old_pid=$(ps ax|grep $script_name|grep -v grep|awk '{print $1}')
     echo "old_pid=${old_pid}"
+    source activate LSICCDS_server
     if [ -z $old_pid ];then
         echo "Process Non-existent!"
         echo "Starting Process...."
@@ -17,7 +18,6 @@ restart_service()
         if [ -z ${mid_pid} ];then
             echo "Process Close Success!"
             echo "Start Restarting....."
-            source activate LSICCDS_server
             nohup python $script_name > $log_name 2>&1 &
         else
             echo "Process Close Fail!"
@@ -36,3 +36,4 @@ restart_service()
 restart_service 'CodeStartPerception'
 restart_service 'IncrementalPerceptionAPI'
 restart_service 'IncrementalPerceptionHandler'
+restart_service 'CloneDetectionAPI'
