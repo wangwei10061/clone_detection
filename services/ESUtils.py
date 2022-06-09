@@ -163,3 +163,22 @@ class ESUtils(object):
             index=self.config["elasticsearch"]["index_ngram"], body=body
         )
         return data.body["hits"]["hits"]
+
+    def search_method_filter(
+        self, search_string: str, repo_id: int, filepath: str
+    ):
+        body = {
+            "query": {
+                "bool": {
+                    "must": {"match": {"doc.code": {"query": search_string}}},
+                    "must_not": [
+                        {"match": {"doc.repo_id": repo_id}},
+                        {"match": {"doc.filepath": filepath}},
+                    ],
+                }
+            }
+        }
+        data = self.client.search(
+            index=self.config["elasticsearch"]["index_ngram"], body=body
+        )
+        return data.body["hits"]["hits"]

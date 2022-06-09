@@ -38,21 +38,13 @@ class CloneDetection(object):
                     "end": method.end,
                 }
             )
-            search_results = self.es_utils.search_method(
-                search_string=" ".join(method.tokens)
+            search_results = self.es_utils.search_method_filter(
+                search_string=" ".join(method.tokens),
+                repo_id=method.repo_id,
+                filepath=method.filepath.decode(),
             )
             # search_result = self.es_utils.search_method(search_string="> invoker invocation invocation rpccontext geturl service monitorservice method method monitorservice > last = invoker list")
 
-            # remove same file functions to avoid same function
-
-            def _not_in_same_file(searchResult: dict):
-                return not (
-                    searchResult["_source"]["doc"]["repo_id"] == method.repo_id
-                    and searchResult["_source"]["doc"]["filepath"]
-                    == method.filepath.decode()
-                )
-
-            search_results = list(filter(_not_in_same_file, search_results))
             for search_result in search_results:
                 result.setdefault(method_str, [])
                 result[method_str].append(
