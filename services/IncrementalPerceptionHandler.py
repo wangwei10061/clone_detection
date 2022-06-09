@@ -34,6 +34,8 @@ class IncrementalPerceptionHandler(threading.Thread):
         )
         channel.start_consuming()  # this will block if there is no task remained in the queue
 
+        print("[Info]: Exist thread: " + self.name)
+
     def callback(self, ch, method, properties, body):
         task = json.loads(str(body, encoding="utf-8"))
         commitInfo = CommitInfo.dict2obj(task)

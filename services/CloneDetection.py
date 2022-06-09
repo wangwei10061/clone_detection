@@ -3,8 +3,10 @@
 # author: zhangxunhui
 
 import json
+from typing import List
 
 from ESUtils import ESUtils
+from models.MethodInfo import MethodInfo
 
 
 class CloneDetection(object):
@@ -15,13 +17,32 @@ class CloneDetection(object):
 
     def locationPhase(self):
         """NIL location phase.
-        1. use Elasticsearch to query the related
+        Use Elasticsearch's search engine instead
         """
-        self.es_utils
         pass
 
-    def filterPhase(self):
-        pass
+    def filterPhase(self, method: MethodInfo, candidates: List[dict]):
+        """NIL filter phase.
+        common distinct n-grams * 100 / min(distinct n-grams) >= 10%
+        """
+        method_n_grams = {}
+        for i in range(
+            0, len(method.tokens) - self.config["service"]["ngram"] + 1
+        ):
+            ngram = (
+                self.config["service"]["ngram_connector"].join(
+                    method.tokens[i : i + self.config["service"]["ngram"]]
+                )
+            ).lower()
+            method_n_grams.setdefault(ngram, 0)
+            method_n_grams[ngram] += 1
+
+        def _filter(candidate):
+            # 转换为dict存储ngram
+            print("pause")
+            pass
+
+        return filter(_filter, candidates)
 
     def verificationPhase(self):
         pass
@@ -38,8 +59,10 @@ class CloneDetection(object):
                     "end": method.end,
                 }
             )
+
+            # 1. location phase
             search_results = self.es_utils.search_method_filter(
-                search_string=" ".join(method.tokens),
+                search_string=" ".join(method.tokens).lower(),
                 repo_id=method.repo_id,
                 filepath=method.filepath.decode(),
             )
@@ -60,6 +83,9 @@ class CloneDetection(object):
                         "end": search_result["_source"]["doc"]["end_line"],
                     }
                 )
+
+            # 2. filter phase
+            self.filterPhase(method=method, candidates=search_results)
         return result
 
 

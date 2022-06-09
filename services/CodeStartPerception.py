@@ -3,7 +3,9 @@
 # date: 2022-04-23
 
 import os
+import queue
 import sys
+import threading
 from typing import List
 
 from ChangedMethodExtractor import ChangedMethodExtractor
@@ -100,18 +102,57 @@ class HandleRepository(object):
         else:
             pass  # not a fork repo
 
-        """Handle each commit."""
+        """Handle each commit by multiple threads."""
+        workQueue = queue.Queue()
         for commit in commits:
             if commit.id.decode() in self.handled_commits:
                 continue
             else:
-                HandleCommit(
-                    repo=self.repo,
-                    repoInfo=self.repoInfo,
-                    commit=commit,
-                    config=self.config,
-                    es_utils=self.es_utils,
-                ).run()
+                workQueue.put(commit)
+
+        THREADNUM = self.config["codestart_service"]["THREADNUM"]
+        threads = []
+        for i in range(THREADNUM):
+            t = HandleCommitThread(
+                name="Thread-" + str(i + 1),
+                q=workQueue,
+                config=self.config,
+                handleRepository=self,
+            )
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+
+
+class HandleCommitThread(threading.Thread):
+    def __init__(
+        self,
+        name: str,
+        q: queue.Queue,
+        config: dict,
+        handleRepository: HandleRepository,
+    ):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.q = q
+        self.config = config
+        self.es_utils = ESUtils(config=self.config)
+        self.handleRepository = handleRepository
+
+    def run(self):
+        print("[Info]: Start thread: " + self.name)
+        while not self.q.empty():
+            commit = self.q.get()
+            HandleCommit(
+                repo=self.handleRepository.repo,
+                repoInfo=self.handleRepository.repoInfo,
+                commit=commit,
+                config=self.config,
+                es_utils=self.es_utils,
+            ).run()
+            self.q.task_done()
+        print("[Info]: Exist thread: " + self.name)
 
 
 class HandleCommit(object):
@@ -183,8 +224,8 @@ def handle_repositories(repositories_path: str, config: dict):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for repo_git_path in repo_git_paths:
-            # if "zhangxunhui-outlook" not in repo_git_path:
-            #     continue  # only for test
+            if "dubbo.git" not in repo_git_path:
+                continue  # only for test
             # handle one repository
             handler = HandleRepository(
                 repoInfo=RepoInfo(repo_path=repo_git_path),

@@ -13,7 +13,6 @@ class ESUtils(object):
         self.config = config
         self.urls = self.config["elasticsearch"]["urls"]
         self.client = self.connect()
-        self.special_connector = " "
 
     def connect(self):
         client = Elasticsearch(self.urls)
@@ -37,22 +36,28 @@ class ESUtils(object):
                     "settings": {
                         "analysis": {
                             "filter": {
-                                "n_gram_filter": {
+                                "my_shingle_filter": {
                                     "type": "shingle",
-                                    "min_shingle_size": 5,
-                                    "max_shingle_size": 5,
+                                    "min_shingle_size": self.config["service"][
+                                        "ngram"
+                                    ],
+                                    "max_shingle_size": self.config["service"][
+                                        "ngram"
+                                    ],
                                     "output_unigrams": False,
                                 }
                             },
                             "tokenizer": {
                                 "special_tokenizer": {
                                     "type": "simple_pattern_split",
-                                    "pattern": self.special_connector,
+                                    "pattern": self.config["service"][
+                                        "ngram_connector"
+                                    ],
                                 }
                             },
                             "analyzer": {
                                 "my_analyzer": {
-                                    "filter": ["n_gram_filter"],
+                                    "filter": ["my_shingle_filter"],
                                     "type": "custom",
                                     "tokenizer": "special_tokenizer",
                                 }
@@ -69,7 +74,9 @@ class ESUtils(object):
                             "filepath": {"index": True, "type": "keyword"},
                             "start_line": {"index": True, "type": "keyword"},
                             "end_line": {"index": True, "type": "keyword"},
-                            "code": {
+                            "code": {"index": False, "type": "keyword"},
+                            "code_ngrams": {
+                                "index": True,
                                 "type": "text",
                                 "analyzer": "my_analyzer",
                                 "search_analyzer": "my_analyzer",
@@ -127,18 +134,15 @@ class ESUtils(object):
                 hits = page["hits"]["hits"]
             return list(handled_commits)
 
-    def concat_tokens(self, tokens: list, n=5):
-        ngrams = []
-        for i in range(0, len(tokens) - n + 1):
-            ngram = (self.special_connector.join(tokens[i : i + n])).lower()
-            ngrams.append(ngram)
-        return ngrams
-
     def extract_es_infos(self, changed_methods: List[MethodInfo]):
         es_data_bulk = []  # used to store the extracted change
         # for changed methods, extract N-Gram list
         for changed_method in changed_methods:
-            code = self.special_connector.join(changed_method.tokens).lower()
+            code = (
+                self.config["service"]["ngram_connector"]
+                .join(changed_method.tokens)
+                .lower()
+            )
             # update the inverted index of elastic search
             es_data = {
                 "_index": self.config["elasticsearch"]["index_ngram"],
@@ -148,6 +152,7 @@ class ESUtils(object):
                     "filepath": changed_method.filepath.decode(),
                     "start_line": changed_method.start,
                     "end_line": changed_method.end,
+                    "code_ngrams": code,
                     "code": code,
                 },
             }
@@ -158,7 +163,9 @@ class ESUtils(object):
         pass
 
     def search_method(self, search_string: str):
-        body = {"query": {"match": {"doc.code": {"query": search_string}}}}
+        body = {
+            "query": {"match": {"doc.code_ngrams": {"query": search_string}}}
+        }
         data = self.client.search(
             index=self.config["elasticsearch"]["index_ngram"], body=body
         )
@@ -170,7 +177,9 @@ class ESUtils(object):
         body = {
             "query": {
                 "bool": {
-                    "must": {"match": {"doc.code": {"query": search_string}}},
+                    "must": {
+                        "match": {"doc.code_ngrams": {"query": search_string}}
+                    },
                     "must_not": [
                         {"match": {"doc.repo_id": repo_id}},
                         {"match": {"doc.filepath": filepath}},
