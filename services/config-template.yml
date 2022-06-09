@@ -1,0 +1,34 @@
+gitea:
+  repositories_path: "path to your cloned folder.../LSICCDS_server/dependencies/gitea/git/repositories"
+
+elasticsearch:
+  urls:
+    - "http://localhost:9200"
+  index_ngram: "n_grams"
+  index_handled_commits: "handled_commits"
+
+mysql:
+  host: "127.0.0.1"
+  port: 3307
+  username: "gitea"
+  password: "gitea"
+  database: "gitea"
+
+rabbitmq:
+  host: "127.0.0.1"
+  port: 5672
+
+service:
+  lang_suffix:
+    - "java"
+  mit: 50
+  mil: 6
+  ngram: 5
+  filter_threshold: 10
+  verify_threshold: 70
+
+codestart_service:
+  THREADNUM: 2
+
+incremental_service:
+  THREADNUM: 2
