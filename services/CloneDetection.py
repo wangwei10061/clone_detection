@@ -33,11 +33,14 @@ class CloneDetection(object):
                 ngramSize=self.config["service"]["ngram"],
             )
             minV = min(len(set(method.ngrams)), len(set(candidate_ngrams)))
-            # return len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV >= self.config['service']['filter_threshold']
             return (
                 len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
-                >= 1  # only for test
+                >= self.config["service"]["filter_threshold"]
             )
+            # return (
+            #     len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
+            #     >= 1  # only for test
+            # )
 
         return list(filter(_filter, candidates))
 
@@ -51,8 +54,8 @@ class CloneDetection(object):
             Y = candidate["code"].split(" ")
             minV = min(len(X), len(Y))
             sim = LCS().lcs(X, Y) * 100 / minV
-            # if sim >= self.config["service"]["verify_threshold"]:
-            if sim >= 1:  # only for test
+            if sim >= self.config["service"]["verify_threshold"]:
+                # if sim >= 1:  # only for test
                 candidate["similarity"] = sim
                 result.append(candidate)
         return result
