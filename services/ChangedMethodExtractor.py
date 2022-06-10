@@ -7,6 +7,7 @@ from parser.FuncExtractor import FuncExtractor
 from typing import List
 
 from dulwich.diff_tree import TreeChange
+from dulwich.objects import Commit
 from dulwich.repo import Repo
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
@@ -24,13 +25,14 @@ class ChangedMethodExtractor(object):
         self,
         repo: Repo,
         repoInfo: RepoInfo,
-        commit_sha: str,
+        commit: Commit,
         t_changes: List[TreeChange],
         config,
     ):
         self.repo = repo
         self.repoInfo = repoInfo
-        self.commit_sha = commit_sha
+        self.commit = commit
+        self.commit_sha = self.commit.id.decode()
         self.t_changes = t_changes
         self.config = config
 
@@ -104,7 +106,7 @@ class ChangedMethodExtractor(object):
         # read all the methods, and line method index relationship
         new_methods, new_line_method_dict = FuncExtractor(
             repoInfo=self.repoInfo,
-            commit_sha=self.commit_sha,
+            commit=self.commit,
             filepath=filepath,
             content=content,
             config=self.config,
@@ -140,7 +142,7 @@ class ChangedMethodExtractor(object):
         new_content = self.repo.object_store[new_object_sha].data
         new_methods, new_line_method_dict = FuncExtractor(
             repoInfo=self.repoInfo,
-            commit_sha=self.commit_sha,
+            commit=self.commit,
             filepath=new_filepath,
             content=new_content,
             config=self.config,
@@ -159,7 +161,7 @@ class ChangedMethodExtractor(object):
         old_content = self.repo.object_store[old_object_sha].data
         old_methods, old_line_method_dict = FuncExtractor(
             repoInfo=self.repoInfo,
-            commit_sha=self.commit_sha,
+            commit=self.commit,
             filepath=old_filepath,
             content=old_content,
             config=self.config,

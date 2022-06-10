@@ -2,6 +2,8 @@
 # author: zhangxunhui
 # date: 2022-04-23
 
+from datetime import datetime, timezone
+
 import yaml
 
 
@@ -34,3 +36,13 @@ def extract_n_grams(tokens: str, ngramSize: int):
     for i in range(len(tokens) - ngramSize + 1):
         ngrams.append(" ".join(tokens[i : i + ngramSize]))
     return ngrams
+
+
+def convert_time2utc(t, tz):
+    return (
+        t - tz
+    )  # because the timezone in dulwich.objects.Commit is already in second scale
+
+
+if __name__ == "__main__":
+    print(convert_time2utc(1319140312, 0))

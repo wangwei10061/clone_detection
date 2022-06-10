@@ -33,6 +33,11 @@ class MethodInfo(object):
         else:
             self.commit_sha = None
 
+        if "created_at" in kwargs:
+            self.created_at = kwargs["created_at"]
+        else:
+            self.created_at = None
+
         if "filepath" in kwargs:
             self.filepath = kwargs["filepath"]
         else:

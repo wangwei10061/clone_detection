@@ -79,6 +79,9 @@ class HandlePR(object):
         )
         self.head_repo = Repo(self.headRepoInfo.repo_path)
 
+        self.head_commit = self.head_repo.object_store[self.head_commit_sha]
+        self.base_commit = self.base_repo.object_store[self.base_commit_sha]
+
     def extract_changed_methods(self):
 
         """Compare the diff between head_commit_sha and base_commit_sha.
@@ -112,7 +115,7 @@ class HandlePR(object):
         changed_methods = ChangedMethodExtractor(
             repo=self.head_repo,
             repoInfo=self.headRepoInfo,
-            commit_sha=self.head_commit_sha,
+            commit=self.head_commit,
             t_changes=t_changes,
             config=self.config,
         ).parse()

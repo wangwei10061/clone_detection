@@ -54,6 +54,12 @@ class HandleRepository(object):
     def run(self):
         """Get all the commits."""
 
+        print(
+            "[Info]: Handling repository {repo_path}".format(
+                repo_path=self.repo.path
+            )
+        )
+
         commits: List[Commit] = []
 
         object_store = self.repo.object_store
@@ -102,55 +108,41 @@ class HandleRepository(object):
         else:
             pass  # not a fork repo
 
-        """Handle each commit by multiple threads."""
-        workQueue = queue.Queue()
+        """Handle each commit."""
         for commit in commits:
-            if commit.id.decode() in self.handled_commits:
-                continue
-            else:
-                workQueue.put(commit)
-
-        THREADNUM = self.config["codestart_service"]["THREADNUM"]
-        threads = []
-        for i in range(THREADNUM):
-            t = HandleCommitThread(
-                name="Thread-" + str(i + 1),
-                q=workQueue,
+            HandleCommit(
+                repo=self.repo,
+                repoInfo=self.repoInfo,
+                commit=commit,
                 config=self.config,
-                handleRepository=self,
-            )
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
+                es_utils=self.es_utils,
+            ).run()
 
 
-class HandleCommitThread(threading.Thread):
+class HandleRepoThread(threading.Thread):
     def __init__(
         self,
         name: str,
         q: queue.Queue,
         config: dict,
-        handleRepository: HandleRepository,
     ):
         threading.Thread.__init__(self)
         self.name = name
         self.q = q
         self.config = config
         self.es_utils = ESUtils(config=self.config)
-        self.handleRepository = handleRepository
 
     def run(self):
         print("[Info]: Start thread: " + self.name)
         while not self.q.empty():
-            commit = self.q.get()
-            HandleCommit(
-                repo=self.handleRepository.repo,
-                repoInfo=self.handleRepository.repoInfo,
-                commit=commit,
+            repoInfo = self.q.get()
+            # handle one repository
+            handler = HandleRepository(
+                repoInfo=repoInfo,
                 config=self.config,
                 es_utils=self.es_utils,
-            ).run()
+            )
+            handler.run()
             self.q.task_done()
         print("[Info]: Exist thread: " + self.name)
 
@@ -189,7 +181,7 @@ class HandleCommit(object):
         changed_methods = ChangedMethodExtractor(
             repo=self.repo,
             repoInfo=self.repoInfo,
-            commit_sha=commit_sha,
+            commit=self.commit,
             t_changes=t_changes,
             config=self.config,
         ).parse()
@@ -214,6 +206,9 @@ def handle_repositories(repositories_path: str, config: dict):
     es_utils.create_n_gram_index()
     es_utils.create_handled_commit_index()
 
+    """Handle repositories by multiple threads."""
+    workQueue = queue.Queue()
+
     # iterate all the ownernames
     ownername_paths = [
         f.path for f in os.scandir(repositories_path) if f.is_dir()
@@ -224,15 +219,23 @@ def handle_repositories(repositories_path: str, config: dict):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for repo_git_path in repo_git_paths:
-            if "test1.git" not in repo_git_path:
-                continue  # only for test
-            # handle one repository
-            handler = HandleRepository(
-                repoInfo=RepoInfo(repo_path=repo_git_path),
-                config=config,
-                es_utils=es_utils,
-            )
-            handler.run()
+            # if "test1.git" not in repo_git_path:
+            #     continue  # only for test
+
+            workQueue.put(RepoInfo(repo_path=repo_git_path))
+
+    THREADNUM = config["codestart_service"]["THREADNUM"]
+    threads = []
+    for i in range(THREADNUM):
+        t = HandleRepoThread(
+            name="Thread-" + str(i + 1),
+            q=workQueue,
+            config=config,
+        )
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
 
 
 def main():

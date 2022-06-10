@@ -50,7 +50,7 @@ class CloneDetection(object):
         for candidate in candidates:
             Y = candidate["code"].split(" ")
             minV = min(len(X), len(Y))
-            sim = LCS().lcs(X, Y, len(X), len(Y)) * 100 / minV
+            sim = LCS().lcs(X, Y) * 100 / minV
             if sim >= self.config["service"]["verify_threshold"]:
                 candidate["similarity"] = sim
                 result.append(candidate)

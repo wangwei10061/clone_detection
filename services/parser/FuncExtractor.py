@@ -3,22 +3,24 @@ from parser.java.JavaParser import JavaParser
 from parser.java.JavaParserListener import JavaParserListener
 
 from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
+from dulwich.objects import Commit
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
-from utils import is_file_supported
+from utils import convert_time2utc, is_file_supported
 
 
 class FuncExtractor(JavaParserListener):
     def __init__(
         self,
         repoInfo: RepoInfo,
-        commit_sha: str,
+        commit: Commit,
         filepath: str,
         content: str,
         config: dict,
     ):
         self.repoInfo = repoInfo
-        self.commit_sha = commit_sha
+        self.commit = commit
+        self.commit_sha = self.commit.id.decode()
         self.filepath = filepath
         self.content = content
         self.config = config
@@ -59,6 +61,9 @@ class FuncExtractor(JavaParserListener):
                     ownername=self.repoInfo.ownername,
                     reponame=self.repoInfo.reponame,
                     commit_sha=self.commit_sha,
+                    created_at=convert_time2utc(
+                        self.commit.author_time, self.commit.author_timezone
+                    ),
                     filepath=self.filepath,
                     start=start_line,
                     end=end_line,

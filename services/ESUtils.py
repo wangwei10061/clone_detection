@@ -66,6 +66,7 @@ class ESUtils(object):
                             "filepath": {"type": "keyword"},
                             "start_line": {"type": "integer"},
                             "end_line": {"type": "integer"},
+                            "created_at": {"type": "long"},
                             "code_ngrams": {
                                 "type": "text",
                                 "analyzer": "shingle_analyzer",
@@ -133,6 +134,7 @@ class ESUtils(object):
                 "_index": self.config["elasticsearch"]["index_ngram"],
                 "repo_id": changed_method.repo_id,
                 "commit_sha": changed_method.commit_sha,
+                "created_at": changed_method.created_at,
                 "filepath": changed_method.filepath.decode(),
                 "start_line": changed_method.start,
                 "end_line": changed_method.end,
