@@ -36,7 +36,7 @@ class CloneDetection(object):
             # return len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV >= self.config['service']['filter_threshold']
             return (
                 len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
-                >= 1
+                >= 1  # only for test
             )
 
         return list(filter(_filter, candidates))
@@ -51,7 +51,8 @@ class CloneDetection(object):
             Y = candidate["code"].split(" ")
             minV = min(len(X), len(Y))
             sim = LCS().lcs(X, Y) * 100 / minV
-            if sim >= self.config["service"]["verify_threshold"]:
+            # if sim >= self.config["service"]["verify_threshold"]:
+            if sim >= 1:  # only for test
                 candidate["similarity"] = sim
                 result.append(candidate)
         return result
@@ -82,6 +83,7 @@ class CloneDetection(object):
                 result[method_str].append(
                     {
                         "commit_sha": search_result["_source"]["commit_sha"],
+                        "created_at": search_result["_source"]["created_at"],
                         "repo_id": search_result["_source"]["repo_id"],
                         "filepath": search_result["_source"]["filepath"],
                         "start": search_result["_source"]["start_line"],
@@ -101,8 +103,17 @@ class CloneDetection(object):
                 method=method, candidates=result[method_str]
             )
 
-            # 4. 对得到的结果进行排序，选择时间最早的一个
-            print("pause")
+            # 4. sort the result and get the oldest one
+            def _sort_key(ele):
+                return ele["created_at"]
+
+            result[method_str].sort(key=_sort_key)
+
+            # 5. keep the first one
+            if len(result[method_str]) > 0:
+                result[method_str] = result[method_str][:1]
+            else:
+                del result[method_str]
 
         return result
 

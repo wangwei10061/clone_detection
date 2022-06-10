@@ -79,8 +79,12 @@ class HandlePR(object):
         )
         self.head_repo = Repo(self.headRepoInfo.repo_path)
 
-        self.head_commit = self.head_repo.object_store[self.head_commit_sha]
-        self.base_commit = self.base_repo.object_store[self.base_commit_sha]
+        self.head_commit = self.head_repo.object_store[
+            self.head_commit_sha.encode()
+        ]
+        self.base_commit = self.base_repo.object_store[
+            self.base_commit_sha.encode()
+        ]
 
     def extract_changed_methods(self):
 

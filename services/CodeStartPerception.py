@@ -219,8 +219,8 @@ def handle_repositories(repositories_path: str, config: dict):
             f.path for f in os.scandir(ownername_path) if f.is_dir()
         ]
         for repo_git_path in repo_git_paths:
-            # if "test1.git" not in repo_git_path:
-            #     continue  # only for test
+            if "test1.git" not in repo_git_path:
+                continue  # only for test
 
             workQueue.put(RepoInfo(repo_path=repo_git_path))
 
