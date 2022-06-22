@@ -2,6 +2,9 @@ dependencies/*
 !dependencies/docker-compose.yml
 services/config.yml
 .vscode/
+test/config.yml
+test/*.log
+test/*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
