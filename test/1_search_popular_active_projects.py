@@ -3,8 +3,7 @@
 # date: 2022-06-22
 
 import json
-import operator
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import requests
 import yaml
@@ -17,7 +16,8 @@ projects = []
 
 def query_projects():
     """
-    https://api.github.com/search/repositories?q=language:java+pushed:>=2022-06-21T12:07:55Z&sort=stars&order=desc&per_page=100&page=1
+    url: https://api.github.com/search/repositories?q=language:java+pushed:>=2022-06-21T12:19:49Z&sort=stars&order=desc&per_page=100&page=1
+    total_count: 27406
     """
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(days=1)
@@ -38,6 +38,8 @@ def query_projects():
     response.encoding = "utf-8"
     result = json.loads(response.text)
     projects.extend(result["items"])
+
+    print(result["total_count"])
 
     with open("test/1_search_popular_active_projects.json", "w") as f:
         json.dump(projects, f)
