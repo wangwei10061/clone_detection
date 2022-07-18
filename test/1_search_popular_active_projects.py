@@ -28,7 +28,7 @@ def query_projects():
     print(url)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3941.4 Safari/537.36",
-        "Authorization": "token " + config["token"],
+        "Authorization": "token " + config["github_token"],
         "Content-Type": "application/json",
         "method": "GET",
         "Accept": "application/vnd.github.squirrel-girl-preview+json",

@@ -2,6 +2,13 @@
 # author: zhangxunhui
 # date: 2022-07-04
 
+"""
+result:
+start time in seconds: 1490758997
+end time in seconds: 1490845396
+max commit num: 5882
+"""
+
 import os
 
 from dulwich.objects import Blob, Commit, Tag, Tree

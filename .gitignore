@@ -6,6 +6,7 @@ test/config.yml
 test/*.log
 test/*.json
 test/bare_repos
+*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

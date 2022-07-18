@@ -1,1 +1,3 @@
-token: "You personal github access token"
+github_token: "Your personal github access token"
+gitea_token: "Your personal gitea access token"
+gitea_password: "Your password for the test login"
