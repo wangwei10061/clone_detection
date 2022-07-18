@@ -7,6 +7,7 @@ test/*.log
 test/*.json
 test/bare_repos
 *.out
+!test/6_fake_commitInfos.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
