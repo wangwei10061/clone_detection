@@ -37,3 +37,8 @@ class RabbitmqUtils(object):
                 ),
             )
         self.close()
+
+    def purgeMQ(self, queueName):
+        channel = self.conn.channel()
+        channel.queue_purge(queue=queueName)
+        self.close()
