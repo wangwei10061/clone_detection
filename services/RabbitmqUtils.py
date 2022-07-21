@@ -42,3 +42,10 @@ class RabbitmqUtils(object):
         channel = self.conn.channel()
         channel.queue_purge(queue=queueName)
         self.close()
+
+    def calRemainedTasks(self, queueName):
+        channel = self.conn.channel()
+        queue = channel.queue_declare(queue=queueName, durable=True)
+        qSize = queue.method.message_count
+        self.close()
+        return qSize

@@ -8,8 +8,8 @@ commitInfo = CommitInfo(
     reponame=reponame,
     sha=sha,
 )
-start time in seconds: 1490758997
-end time in seconds: 1490845396
+start time in seconds: 1490759292
+end time in seconds: 1490845691
 """
 import json
 import os
@@ -41,10 +41,21 @@ service_config = read_config(service_config_path)
 ownername = "test_performance"
 
 
-def find_commits(start_time=1490758997, end_time=1490845396):
+def find_commits(start_time=1490759292, end_time=1490845691):
     # find all the commits
     commitList = []
-    repo_paths, repo_names = find_bare_repos()
+    repo_paths = []  # record all the repo paths
+    repo_names = []  # record all the repo names
+    root_path = "dependencies/gitea/git/repositories/test_performance"
+    for root, directories, _ in os.walk(root_path):
+        for directory in directories:
+            if not directory.endswith(".git"):
+                continue
+            abs_directory = os.path.join(root, directory)
+            repo_name = directory[:-4]
+            repo_paths.append(abs_directory)
+            repo_names.append(repo_name)
+    print("finish reading all the repos' paths")
     for i in range(len(repo_paths)):
         repo_path = repo_paths[i]
         repo_name = repo_names[i]

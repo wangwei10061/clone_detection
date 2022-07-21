@@ -10,3 +10,4 @@ Flask-RESTful==0.3.9
 flasgger==0.9.5
 pika==1.2.1
 requests==2.28.0
+APScheduler==3.9.1

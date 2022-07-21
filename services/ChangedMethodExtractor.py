@@ -3,7 +3,6 @@
 # author: zhangxunhui
 
 from difflib import SequenceMatcher
-from parser.FuncExtractor import FuncExtractor
 from typing import List
 
 from dulwich.diff_tree import TreeChange
@@ -11,7 +10,9 @@ from dulwich.objects import Commit
 from dulwich.repo import Repo
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
-from utils import is_file_supported
+
+from services.parser.FuncExtractor import FuncExtractor
+from services.utils import is_file_supported
 
 
 class ChangedMethodExtractor(object):

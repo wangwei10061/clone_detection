@@ -10,4 +10,4 @@ ENV PATH="/home/myuser/.local/bin:${PATH}"
 
 COPY --chown=myuser:myuser . .
 RUN pip install --user -r requirements.txt > /dev/null 2>&1
-CMD [ "python", "./services/CodeStartPerception.py"]
+CMD [ "python", "./services/ColdStartPerception.py"]

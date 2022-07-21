@@ -4,9 +4,9 @@
 
 """
 result:
-start time in seconds: 1490758997
-end time in seconds: 1490845396
-max commit num: 5882
+start time in seconds: 1490759292
+end time in seconds: 1490845691
+max commit num: 5866
 """
 
 import os
@@ -17,17 +17,13 @@ from dulwich.repo import Repo
 
 def day_selection():
     repo_paths = []  # record all the repo paths
-    root_path = "test/bare_repos"
+    root_path = "dependencies/gitea/git/repositories/test_performance"
     for root, directories, _ in os.walk(root_path):
         for directory in directories:
+            if not directory.endswith(".git"):
+                continue
             abs_directory = os.path.join(root, directory)
-            for root2, directories2, _ in os.walk(abs_directory):
-                if (
-                    os.path.relpath(root2, root_path).count(os.sep) > 0
-                ):  # this is not the second level
-                    continue
-                for directory2 in directories2:
-                    repo_paths.append(os.path.join(root2, directory2))
+            repo_paths.append(abs_directory)
     print("finish reading all the repos' paths")
 
     commit_dict = {}  # key: commit_time, count of commits
@@ -38,20 +34,14 @@ def day_selection():
         object_shas = list(iter(object_store))
         for object_sha in object_shas:
             obj = object_store[object_sha]
-            if (
-                isinstance(obj, Tag)
-                or isinstance(obj, Blob)
-                or isinstance(obj, Tree)
-            ):
-                pass
-            elif isinstance(obj, Commit):
+            if isinstance(obj, Commit):
                 commit_time = (
                     obj.commit_time - obj.commit_timezone
                 )  # get the utc time
                 commit_dict.setdefault(commit_time, 0)
                 commit_dict[commit_time] += 1
             else:
-                raise Exception("Unknown type!")
+                continue
 
     print("sorting commit dict")
     # sort the dict by commit_time asc

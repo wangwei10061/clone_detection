@@ -9,7 +9,7 @@ from services.parser.java.JavaParserListener import JavaParserListener
 from services.utils import convert_time2utc, is_file_supported
 
 
-class FuncExtractor(JavaParserListener):
+class FuncExtractor:
     def __init__(
         self,
         repoInfo: RepoInfo,

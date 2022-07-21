@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build image
-        run: docker build --no-cache --tag $IMAGE_NAME --file Dockerfiles/CodeStartPerception/Dockerfile .
+        run: docker build --no-cache --tag $IMAGE_NAME --file Dockerfiles/ColdStartPerception/Dockerfile .
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:

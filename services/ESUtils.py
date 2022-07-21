@@ -2,8 +2,10 @@
 # author: zhangxunhui
 # date: 2022-05-27
 
+import os
 from typing import List
 
+import yaml
 from elasticsearch import Elasticsearch, helpers
 from models.MethodInfo import MethodInfo
 
@@ -171,3 +173,18 @@ class ESUtils(object):
             index=self.config["elasticsearch"]["index_ngram"], body=body
         )
         return data.body["hits"]["hits"]
+
+    def delete_index(self, index_name):
+        if self.is_index_exists(index_name=index_name):
+            self.client.indices.delete(index=index_name)
+
+
+if __name__ == "__main__":
+    config_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "config.yml"
+    )
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    es = ESUtils(config=config)
+    es.delete_index("n_grams_test4")
+    print("finish")

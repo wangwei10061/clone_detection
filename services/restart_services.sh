@@ -34,7 +34,7 @@ restart_service()
     fi
 }
 
-restart_service 'CodeStartPerception'
+restart_service 'ColdStartPerception'
 restart_service 'IncrementalPerceptionAPI'
 restart_service 'IncrementalPerceptionHandler'
 restart_service 'CloneDetectionAPI'

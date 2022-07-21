@@ -1,4 +1,4 @@
-# aim: The CodeStartPerception service for LSICCDS_server
+# aim: The ColdStartPerception service for LSICCDS_server
 # author: zhangxunhui
 # date: 2022-04-23
 
@@ -15,7 +15,8 @@ from dulwich.walk import WalkEntry
 from ESUtils import ESUtils
 from models.RepoInfo import RepoInfo
 from MySQLUtils import MySQLUtils
-from utils import read_config
+
+from services.utils import read_config
 
 
 class HandleRepository(object):
@@ -262,4 +263,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    print("Finish CodeStartPerception service")
+    print("Finish ColdStartPerception service")
