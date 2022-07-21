@@ -38,7 +38,7 @@ service_config = read_config(service_config_path)
 
 num_tasks = -1
 
-THREADNUM = 3
+THREADNUM = 1
 
 recorder_file = "test/7_{threadNum}_result".format(threadNum=THREADNUM)
 

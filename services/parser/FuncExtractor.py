@@ -17,6 +17,7 @@ class FuncExtractor(JavaParserListener):
         filepath: str,
         content: str,
         config: dict,
+        object_sha: str,
     ):
         self.repoInfo = repoInfo
         self.commit = commit
@@ -24,6 +25,7 @@ class FuncExtractor(JavaParserListener):
         self.filepath = filepath
         self.content = content
         self.config = config
+        self.object_sha = object_sha
         self.methods = []  # used to store the methods in the file
         self.line_method_dict = (
             {}

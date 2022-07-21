@@ -11,7 +11,7 @@ from dulwich.repo import Repo
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
 
-from services.parser.FuncExtractor import FuncExtractor
+from services.parser.FuncExtractor_txl import FuncExtractor
 from services.utils import is_file_supported
 
 
@@ -111,6 +111,7 @@ class ChangedMethodExtractor(object):
             filepath=filepath,
             content=content,
             config=self.config,
+            object_sha=object_sha.decode(),
         ).parse_file()
         # extract the changed methods
         changed_method_indexes = list(
@@ -147,6 +148,7 @@ class ChangedMethodExtractor(object):
             filepath=new_filepath,
             content=new_content,
             config=self.config,
+            object_sha=new_object_sha.decode(),
         ).parse_file()
 
         changed_new_method_indexes = [
@@ -166,6 +168,7 @@ class ChangedMethodExtractor(object):
             filepath=old_filepath,
             content=old_content,
             config=self.config,
+            object_sha=old_object_sha.decode(),
         ).parse_file()
 
         """Extract changed old methods."""

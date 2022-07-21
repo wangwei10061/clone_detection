@@ -32,3 +32,8 @@ codestart_service:
 
 incremental_service:
   THREADNUM: 2
+
+txl:
+  basepath: "The absolute TXL tool path"
+  relbinpath: "The relative path of txl bin file"
+  relextractorpath: "The relative path of java function extractor"

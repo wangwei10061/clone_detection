@@ -41,3 +41,34 @@ docker ps # test whether docker command can be used
 
   ![image](pics/gitea-system-webhook-setting.png)
 </details>
+
+6. Download [TXL](http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz) using command `wget http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz`.
+
+7. Download TXL:
+```
+tar -zxvf 16963-txl10.8b.linux64.tar.gz
+rm 16963-txl10.8b.linux64.tar.gz
+mv txl10.8b.linux64 services/parser/txl
+mkdir services/parser/txl/grammers
+mkdir services/parser/txl/grammers/java
+```
+
+8. Append Java Grammer:
+```
+wget http://www.txl.ca/examples/Grammars/Java8/Java8.tar.gz
+tar -zxvf Java8.tar.gz
+rm Java8.tar.gz
+mv Java8/java.* services/parser/txl/grammers/java
+rm -fr Java8
+wget http://www.txl.ca/examples/Grammars/BOM/BOM.tar.gz
+tar -zxvf BOM.tar.gz
+rm BOM.tar.gz
+mv BOM/bom.grm services/parser/txl/grammers/java
+rm -fr BOM
+wget https://www.txl.ca/download/20818-NiCad-6.2.tar.gz
+tar -zxvf 20818-NiCad-6.2.tar.gz
+rm 20818-NiCad-6.2.tar.gz
+cp NiCad-6.2/txl/java-extract-functions.txl services/parser/txl/grammers/java
+cp NiCad-6.2/txl/nicad.grm services/parser/txl/grammers/java
+rm -fr NiCad-6.2
+```
