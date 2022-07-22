@@ -7,7 +7,6 @@ import os
 import queue
 import sys
 import threading
-import time
 
 import yaml
 
@@ -38,7 +37,7 @@ service_config = read_config(service_config_path)
 
 num_tasks = -1
 
-THREADNUM = 1
+THREADNUM = int(sys.argv[1])
 
 recorder_file = "test/7_{threadNum}_result".format(threadNum=THREADNUM)
 
@@ -142,19 +141,19 @@ if __name__ == "__main__":
     es_utils.create_handled_commit_index()
 
     fake_commitInfos = read_fake_commits()
-    for i in range(len(fake_commitInfos)):
-        for _ in range(20):  # 105254
+    for _ in range(1):  # 105254
+        for i in range(len(fake_commitInfos)):
             q.put(i)
-            if q.qsize() > 1000:  # this is for test
-                break
-        if q.qsize() > 1000:  # this is for test
-            break
+        #     if q.qsize() > 1000:  # this is for test
+        #         break
+        # if q.qsize() > 1000:  # this is for test
+        #     break
     num_tasks = q.qsize()
 
     # run the handler and record the remained tasks
     scheduler = BackgroundScheduler()
     trigger = TriggerManager.interval_trigger(
-        conf={"timeInterval": 5, "timeUnit": "s"}
+        conf={"timeInterval": 30, "timeUnit": "s"}
     )
     scheduler.add_job(cal_remained_tasks, trigger, id="1")
     scheduler.start()

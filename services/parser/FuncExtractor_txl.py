@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 
 from dulwich.objects import Commit
@@ -41,9 +42,9 @@ class FuncExtractor:
             f.write(self.content.decode())
 
     def deleteTempFile(self):
-        os.remove(self.temp_filepath)
+        shutil.rmtree(self.temp_filepath, ignore_errors=True)
 
-    def txlExtractFunctionsForFile(self, filePath: str):
+    def txlExtractFunctionsForFile(self):
         # firstly create a temp file
         self.createTempFile()
         p = subprocess.Popen(
@@ -154,7 +155,7 @@ class FuncExtractor:
         ):
             if self.filepath.endswith(b".java"):
                 self.extractFunInfo(
-                    self.txlExtractFunctionsForFile(self.filepath),
+                    self.txlExtractFunctionsForFile(),
                     self.filepath.decode(),
                 )
         else:
