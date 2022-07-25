@@ -10,10 +10,10 @@ import requests
 import yaml
 from dulwich.repo import Repo
 
-base_url = "http://8.130.51.51:3000/api/v1"
-
 with open("test/config.yml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
+
+base_url = "http://{gitea_host}/api/v1".format(gitea_host=config['gitea_host'])
 
 headers = {
     "Authorization": "token " + config["gitea_token"],
@@ -70,7 +70,8 @@ def upload_projects(login="test_performance"):
 
         # upload the bare repository
         origin_url = (
-            "http://8.130.51.51:3000/{ownername}/{reponame}.git".format(
+            "http://{gitea_host}/{ownername}/{reponame}.git".format(
+                gitea_host=config['gitea_host'],
                 ownername=login, reponame=repo_name
             )
         )
@@ -79,10 +80,11 @@ def upload_projects(login="test_performance"):
             + repo_path
             + " && git remote set-url origin "
             + origin_url
-            + " && git push http://{ownername}:{password}@8.130.51.51:3000/{ownername}/{reponame}.git --all".format(
+            + " && git push http://{ownername}:{password}@{gitea_host}/{ownername}/{reponame}.git --all".format(
                 ownername=login,
                 password=config["gitea_password"],
                 reponame=repo_name,
+                gitea_host=config['gitea_host'],
             ),
             stdout=subprocess.PIPE,
             shell=True,

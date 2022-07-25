@@ -1,4 +1,5 @@
 github_token: "Your personal github access token"
+gitea_host: "Your own host address of gitea"
 gitea_token: "Your personal gitea access token"
 gitea_password: "Your password for the test login"
 gitea_repo_path: "Your gitea base directory path"
