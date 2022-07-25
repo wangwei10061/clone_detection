@@ -10,6 +10,7 @@ test/bare_repos
 !test/6_fake_commitInfos.json
 test/7_*_result
 services/parser/txl
+!test/1_search_popular_active_projects.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
