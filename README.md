@@ -15,6 +15,10 @@ newgrp docker
 docker ps # test whether docker command can be used
 ```
 
+Install docker-compose following this [guide](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-compose-on-ubuntu-20-04).
+
+Install the dependencies using the following steps:
+
 1. `docker network create LSICCDS_server` to create the network.
 2. `cd dependencies`
 3. `docker-compose up -d` to install all the dependent services, including gitea (the dependent mysql), rabbitmq, elasticsearch, kibana.
