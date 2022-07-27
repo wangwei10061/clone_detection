@@ -11,7 +11,7 @@ from dulwich.repo import Repo
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
 
-from services.parser.FuncExtractor_txl import FuncExtractor
+from services.parser.FuncExtractor_nil import FuncExtractor
 from services.utils import is_file_supported
 
 

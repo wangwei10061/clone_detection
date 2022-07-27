@@ -37,3 +37,7 @@ txl:
   basepath: "The absolute TXL tool path"
   relbinpath: "The relative path of txl bin file"
   relextractorpath: "The relative path of java function extractor"
+
+nil:
+  basepath: "The absolute NIL tool path"
+  rel_func_extractor_path: "Func-extractor-LSICCDS.jar"
