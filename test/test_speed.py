@@ -290,6 +290,26 @@ class HandleFile(object):
         self.filepath = filepath
         self.es_utils = es_utils
 
+    def record_clones(self, method: MethodInfo, clones: List[dict]):
+        with open(
+            "test/test_speed_middle_results/LSICCDS_clone_pairs", "a"
+        ) as f:
+            for clone in clones:
+                f.write(
+                    method.filepath
+                    + ","
+                    + str(method.start)
+                    + ","
+                    + str(method.end)
+                    + ";"
+                    + clone["filepath"]
+                    + ","
+                    + str(clone["start"])
+                    + ","
+                    + str(clone["end"])
+                    + "\n"
+                )
+
     def run(self):
         print(
             "[Info]: Handling file {filepath}".format(filepath=self.filepath)
@@ -299,7 +319,11 @@ class HandleFile(object):
 
         """Do clone detection for each method."""
         for method in methods:
-            _ = CloneDetection(method=method, es_utils=self.es_utils).run()
+            clones = CloneDetection(
+                method=method, es_utils=self.es_utils
+            ).run()
+            # record the results
+            self.record_clones(method=method, clones=clones)
 
         actions = []  # used to store the method infos
         # for changed methods, extract N-Gram list
@@ -375,6 +399,10 @@ if __name__ == "__main__":
 
     # delete and re-create the indices
     refresh_indices()
+
+    # delete the clone_pairs file
+    if os.path.exists("test/test_speed_middle_results/LSICCDS_clone_pairs"):
+        os.remove("test/test_speed_middle_results/LSICCDS_clone_pairs")
 
     for repo_num in range(1, REPONUM + 1):
 
