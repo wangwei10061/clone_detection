@@ -11,6 +11,8 @@ test/bare_repos
 test/7_*_result
 services/parser/txl
 !test/1_search_popular_active_projects.json
+test/nonbare_repos/
+test/test_speed_middle_results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

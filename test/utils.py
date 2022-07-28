@@ -4,6 +4,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 
 import requests
@@ -13,7 +14,7 @@ from dulwich.repo import Repo
 with open("test/config.yml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-base_url = "http://{gitea_host}/api/v1".format(gitea_host=config['gitea_host'])
+base_url = "http://{gitea_host}/api/v1".format(gitea_host=config["gitea_host"])
 
 headers = {
     "Authorization": "token " + config["gitea_token"],
@@ -69,11 +70,10 @@ def upload_projects(login="test_performance"):
         create_project(reponame=repo_name)
 
         # upload the bare repository
-        origin_url = (
-            "http://{gitea_host}/{ownername}/{reponame}.git".format(
-                gitea_host=config['gitea_host'],
-                ownername=login, reponame=repo_name
-            )
+        origin_url = "http://{gitea_host}/{ownername}/{reponame}.git".format(
+            gitea_host=config["gitea_host"],
+            ownername=login,
+            reponame=repo_name,
         )
         subprocess.Popen(
             "cd "
@@ -84,7 +84,7 @@ def upload_projects(login="test_performance"):
                 ownername=login,
                 password=config["gitea_password"],
                 reponame=repo_name,
-                gitea_host=config['gitea_host'],
+                gitea_host=config["gitea_host"],
             ),
             stdout=subprocess.PIPE,
             shell=True,
@@ -156,6 +156,37 @@ def create_branch(ownername, reponame, branchname):
     result = requests.post(url=url, data=json.dumps(body), headers=headers)
     if result.status_code != 201:
         print("Error: create repository error")
+
+
+def convert_bare_2_nonbare(bare_repo_path: str, nonbare_repo_path: str):
+    if not os.path.exists(nonbare_repo_path):
+        shutil.copytree(
+            bare_repo_path, os.path.join(nonbare_repo_path, ".git")
+        )
+        p = subprocess.Popen(
+            "cd "
+            + nonbare_repo_path
+            + " && git config --local --bool core.bare false",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        _ = p.stdout.read().decode("utf-8", errors="replace")
+        _ = p.wait()
+        p = subprocess.Popen(
+            "cd " + nonbare_repo_path + " && git reset --hard",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        _ = p.stdout.read().decode("utf-8", errors="replace")
+        _ = p.wait()
+    else:
+        print(
+            "Already created the nonbare repository: {nonbare_repo_path}".format(
+                nonbare_repo_path=nonbare_repo_path
+            )
+        )
 
 
 if __name__ == "__main__":
