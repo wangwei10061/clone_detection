@@ -6,11 +6,11 @@
 Here we use Ant 1.10.1 system mentioned in NIL and copy it X times for clone detection.
 """
 
-import json
 import os
 import shutil
 import subprocess
 import sys
+import time
 from typing import List
 
 currentdir = os.path.dirname(os.path.realpath(__file__))
@@ -367,6 +367,7 @@ class LSICCDSSpeedDetector:
         return len(hits) > 0
 
     def run(self):
+        start_time = int(time.time() * 1000)
         # find all the java files
         list_of_files = []
         for root, directories, files in os.walk(
@@ -382,6 +383,8 @@ class LSICCDSSpeedDetector:
                     filepath=filepath,
                     es_utils=self.es_utils,
                 ).run()
+        end_time = int(time.time() * 1000)
+        return end_time - start_time
 
 
 class NILSpeedDetector:
@@ -411,7 +414,9 @@ if __name__ == "__main__":
 
         # run LSICCDSSpeedDetector
         LSICCDS_detector = LSICCDSSpeedDetector()
-        LSICCDS_detector.run()
+        LSICCDS_time = (
+            LSICCDS_detector.run()
+        )  # get the time used for running the detection
 
         # run NILSpeedDetector
         NIL_detector = NILSpeedDetector()
