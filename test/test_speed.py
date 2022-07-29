@@ -17,9 +17,10 @@ currentdir = os.path.dirname(os.path.realpath(__file__))
 parentdir = os.path.dirname(currentdir)
 sys.path.append(parentdir)
 sys.path.append(os.path.join(parentdir, "services"))
+from elasticsearch import helpers
+
 from services.ESUtils import ESUtils
 from services.LCS import LCS
-from services.models.RepoInfo import RepoInfo
 from services.utils import extract_n_grams, read_config
 
 service_config_path = os.path.join(
@@ -27,6 +28,8 @@ service_config_path = os.path.join(
     "services/config.yml",
 )
 service_config = read_config(service_config_path)
+
+FakeTargetDir = "test/test_speed_middle_results/fake_repos"
 
 
 def download_target_project():
@@ -52,15 +55,14 @@ def download_target_project():
 
 
 def copy_fake_repos(repo_num):
-    target_dir = "test/test_speed_middle_results/fake_repos"
-    if os.path.exists(target_dir):
-        shutil.rmtree(target_dir, ignore_errors=True)
-    os.makedirs(target_dir)
+    if os.path.exists(FakeTargetDir):
+        shutil.rmtree(FakeTargetDir, ignore_errors=True)
+    os.makedirs(FakeTargetDir)
 
     for i in range(1, repo_num + 1):
         shutil.copytree(
             "test/test_speed_middle_results/Ant1.10.1",
-            os.path.join(target_dir, str(i)),
+            os.path.join(FakeTargetDir, str(i)),
         )
     print("Finish copying fake repositories!")
 
@@ -156,16 +158,16 @@ class MethodInfo(object):
 class FuncExtractor(object):
     def __init__(
         self,
-        filepath: str,
+        folder: str,
     ):
-        self.filepath = filepath
+        self.folder = folder
         self.methods = []  # used to store the methods in the file
         self.tokens = None
 
-    def nilExtractFunctionsForFile(self):
+    def nilExtractFunctionsForFolder(self):
         p = subprocess.Popen(
-            "java -jar test/NIL-func-extractor-file.jar -fp {filepath} -mit 50 -mil 6".format(
-                filepath=self.filepath
+            "java -jar test/NIL-func-extractor-file.jar -f {folder} -mit 50 -mil 6".format(
+                folder=self.folder
             ),
             shell=True,
             stdout=subprocess.PIPE,
@@ -179,26 +181,29 @@ class FuncExtractor(object):
             for i in range(1, method_num + 1):
                 method_line = lines[len(lines) - 1 - i]
                 position, content = method_line.split(";")
-                _, start_line, end_line = position.split(",")
+                filepath, start_line, end_line = position.split(",")
                 tokens = content.split(",")
                 self.formMethodInfo(
+                    filepath=filepath,
                     start_line=int(start_line),
                     end_line=int(end_line),
                     tokens=tokens,
                 )
 
-    def formMethodInfo(self, start_line: int, end_line: int, tokens: list):
+    def formMethodInfo(
+        self, filepath: str, start_line: int, end_line: int, tokens: list
+    ):
         self.methods.append(
             MethodInfo(
-                filepath=self.filepath,
+                filepath=filepath,
                 start=start_line,
                 end=end_line,
                 tokens=tokens,
             )
         )
 
-    def parse_file(self):
-        self.nilExtractFunctionsForFile()
+    def parse(self):
+        self.nilExtractFunctionsForFolder()
         return self.methods
 
 
@@ -250,32 +255,24 @@ class CloneDetection(object):
         # 1. location phase
         search_results = []
         query = {
-            "bool": {
-                "must": {
-                    "match": {
-                        "code_ngrams": {"query": " ".join(self.method.tokens)}
-                    }
-                },
+            "query": {
+                "bool": {
+                    "must": {
+                        "match": {
+                            "code_ngrams": {
+                                "query": " ".join(self.method.tokens)
+                            }
+                        }
+                    },
+                }
             }
         }
-        scroll = "2m"
-        size = 50
-        page = self.es_utils.client.search(
-            index="test_performance_n_grams",
+        search_results = helpers.scan(
+            client=self.es_utils.client,
             query=query,
-            scroll=scroll,
-            size=size,
+            scroll="1m",
+            index="test_performance_n_grams",
         )
-        hits = page["hits"]["hits"]
-        scroll_id = page.body["_scroll_id"]
-        while len(hits):
-            search_results.extend(hits)  # record the last list of candidates
-            page = self.es_utils.client.scroll(
-                scroll_id=scroll_id, scroll=scroll
-            )
-            scroll_id = page.body["_scroll_id"]
-            hits = page["hits"]["hits"]
-        self.es_utils.client.clear_scroll(scroll_id=scroll_id)
 
         candidates = []
         for search_result in search_results:
@@ -302,8 +299,11 @@ class CloneDetection(object):
 
 
 class HandleFile(object):
-    def __init__(self, filepath: str, es_utils: ESUtils):
+    def __init__(
+        self, filepath: str, methods: List[MethodInfo], es_utils: ESUtils
+    ):
         self.filepath = filepath
+        self.methods = methods
         self.es_utils = es_utils
 
     def record_clones(self, method: MethodInfo, clones: List[dict]):
@@ -330,26 +330,17 @@ class HandleFile(object):
         print(
             "[Info]: Handling file {filepath}".format(filepath=self.filepath)
         )
-        time_start = int(time.time() * 1000)
-        methods = FuncExtractor(filepath=self.filepath).parse_file()
-        print("FuncExtractor: " + str(int(time.time() * 1000) - time_start))
 
         """Do clone detection for each method."""
-        for method in methods:
-            time_start = int(time.time() * 1000)
+        for method in self.methods:
             clones = CloneDetection(
                 method=method, es_utils=self.es_utils
             ).run()
             # record the results
             self.record_clones(method=method, clones=clones)
-            print(
-                "CloneDetection: " + str(int(time.time() * 1000) - time_start)
-            )
 
-        time_start = int(time.time() * 1000)
         actions = []  # used to store the method infos
-        # for changed methods, extract N-Gram list
-        for method in methods:
+        for method in self.methods:
             code = " ".join(method.tokens)
             # update the inverted index of elastic search
             action = {
@@ -369,7 +360,6 @@ class HandleFile(object):
             item=es_data,
             index_name="test_performance_handled_files",
         )
-        print("Storage: " + str(int(time.time() * 1000) - time_start))
 
 
 class LSICCDSSpeedDetector:
@@ -378,7 +368,7 @@ class LSICCDSSpeedDetector:
 
     def is_file_handled(self, filepath: str):
         query = {"term": {"filepath": filepath}}
-        scroll = "2m"
+        scroll = "1m"
         size = 50
         page = self.es_utils.client.search(
             index="test_performance_handled_files",
@@ -391,19 +381,15 @@ class LSICCDSSpeedDetector:
 
     def run(self):
         start_time = int(time.time() * 1000)
-        # find all the java files
-        list_of_files = []
-        for root, directories, files in os.walk(
-            "test/test_speed_middle_results/fake_repos"
-        ):
-            for file in files:
-                if file.endswith(".java"):
-                    list_of_files.append(os.path.join(root, file))
-        for filepath in list_of_files:
+        # find all the unhandled methods
+        methods = FuncExtractor(folder=FakeTargetDir).parse()
+        fm_dict = form_file_method_dict(methods=methods)
+        for filepath in list(fm_dict.keys()):
             # check whether file have already handled
             if not self.is_file_handled(filepath=filepath):
                 HandleFile(
                     filepath=filepath,
+                    methods=fm_dict[filepath],
                     es_utils=self.es_utils,
                 ).run()
         end_time = int(time.time() * 1000)
@@ -414,7 +400,9 @@ class NILSpeedDetector(object):
     def run(self):
         start_time = int(time.time() * 1000)
         p = subprocess.Popen(
-            "java -jar test/NIL.jar -s test/test_speed_middle_results/fake_repos -mit 50 -mil 6 -t 1",
+            "java -jar test/NIL.jar -s {FakeTargetDir} -mit 50 -mil 6 -t 1".format(
+                FakeTargetDir=FakeTargetDir
+            ),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -440,28 +428,15 @@ def record_time(repo_num: int, times: dict, filepath: str):
 def insert_fake_records(es_utils: ESUtils, repo_num: int):
     """Need to handle {repo_num} fake repositories. So we need to insert {repo_num-1} fake records."""
     # Extract fake info from 1 project
+    repo1_path = os.path.join(FakeTargetDir, "1")
     methods_repo1 = []
-    list_of_files_repo1 = []
-    for root, directories, files in os.walk(
-        "test/test_speed_middle_results/fake_repos/1"
-    ):
-        for file in files:
-            if file.endswith(".java"):
-                methods = FuncExtractor(
-                    filepath=os.path.join(root, file)
-                ).parse_file()
-                for method in methods:
-                    method.filepath = os.path.relpath(
-                        os.path.join(root, file),
-                        "test/test_speed_middle_results/fake_repos/1",
-                    )
-                methods_repo1.extend(methods)
-                list_of_files_repo1.append(
-                    os.path.relpath(
-                        os.path.join(root, file),
-                        "test/test_speed_middle_results/fake_repos/1",
-                    )
-                )
+    methods = FuncExtractor(folder=repo1_path).parse()
+    for method in methods:
+        method.filepath = os.path.relpath(
+            method.filepath,
+            repo1_path,
+        )
+    methods_repo1.extend(methods)
 
     for method in methods_repo1:
         actions = []
@@ -471,7 +446,7 @@ def insert_fake_records(es_utils: ESUtils, repo_num: int):
                 "_op_type": "create",
                 "_index": "test_performance_n_grams",
                 "filepath": os.path.join(
-                    "test/test_speed_middle_results/fake_repos",
+                    FakeTargetDir,
                     str(i),
                     method.filepath,
                 ),
@@ -482,6 +457,9 @@ def insert_fake_records(es_utils: ESUtils, repo_num: int):
             actions.append(action)
         es_utils.insert_es_bulk(actions)
 
+    fm_dict = form_file_method_dict(methods=methods_repo1)
+    list_of_files_repo1 = list(fm_dict.keys())
+
     for filepath in list_of_files_repo1:
         actions = []
         for i in range(1, repo_num):
@@ -489,13 +467,21 @@ def insert_fake_records(es_utils: ESUtils, repo_num: int):
                 "_op_type": "create",
                 "_index": "test_performance_handled_files",
                 "filepath": os.path.join(
-                    "test/test_speed_middle_results/fake_repos",
+                    FakeTargetDir,
                     str(i),
                     filepath,
                 ),
             }
             actions.append(action)
         es_utils.insert_es_bulk(actions)
+
+
+def form_file_method_dict(methods: List[MethodInfo]):
+    result = {}  # key: filepath, value: [MethodInfo]
+    for method in methods:
+        result.setdefault(method.filepath, [])
+        result[method.filepath].append(method)
+    return result
 
 
 if __name__ == "__main__":

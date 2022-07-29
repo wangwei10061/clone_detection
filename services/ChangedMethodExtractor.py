@@ -2,6 +2,14 @@
 # date: 2022-05-30
 # author: zhangxunhui
 
+import os
+import sys
+
+currentdir = os.path.dirname(os.path.realpath(__file__))
+parentdir = os.path.dirname(currentdir)
+sys.path.append(parentdir)
+sys.path.append(os.path.join(parentdir, "services"))
+
 from difflib import SequenceMatcher
 from typing import List
 
