@@ -13,6 +13,10 @@ services/parser/txl
 !test/1_search_popular_active_projects.json
 test/nonbare_repos/
 test/test_speed_middle_results/
+clone_pairs
+code_blocks
+functions
+result_*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

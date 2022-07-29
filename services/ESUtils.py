@@ -123,6 +123,7 @@ class ESUtils(object):
                 page = self.client.scroll(scroll_id=scroll_id, scroll=scroll)
                 scroll_id = page.body["_scroll_id"]
                 hits = page["hits"]["hits"]
+            self.client.clear_scroll(scroll_id=scroll_id)
             return list(handled_commits)
 
     def extract_es_infos(self, changed_methods: List[MethodInfo]):

@@ -28,8 +28,6 @@ service_config_path = os.path.join(
 )
 service_config = read_config(service_config_path)
 
-REPONUM = 1  # define the number of fake repositories we want to detect
-
 
 def download_target_project():
     target_dir = "test/test_speed_middle_results"
@@ -47,6 +45,9 @@ def download_target_project():
         )
         _ = p.stdout.read().decode("utf-8", errors="replace")
         _ = p.wait()
+        shutil.rmtree(
+            os.path.join(target_dir, "Ant1.10.1", ".git"), ignore_errors=True
+        )
     print("Finish downloading target project!")
 
 
@@ -247,6 +248,7 @@ class CloneDetection(object):
     def run(self):
 
         # 1. location phase
+        search_results = []
         query = {
             "bool": {
                 "must": {
@@ -256,10 +258,24 @@ class CloneDetection(object):
                 },
             }
         }
-        data = self.es_utils.client.search(
-            index="test_performance_n_grams", query=query
+        scroll = "2m"
+        size = 50
+        page = self.es_utils.client.search(
+            index="test_performance_n_grams",
+            query=query,
+            scroll=scroll,
+            size=size,
         )
-        search_results = data.body["hits"]["hits"]
+        hits = page["hits"]["hits"]
+        scroll_id = page.body["_scroll_id"]
+        while len(hits):
+            search_results.extend(hits)  # record the last list of candidates
+            page = self.es_utils.client.scroll(
+                scroll_id=scroll_id, scroll=scroll
+            )
+            scroll_id = page.body["_scroll_id"]
+            hits = page["hits"]["hits"]
+        self.es_utils.client.clear_scroll(scroll_id=scroll_id)
 
         candidates = []
         for search_result in search_results:
@@ -314,17 +330,23 @@ class HandleFile(object):
         print(
             "[Info]: Handling file {filepath}".format(filepath=self.filepath)
         )
-
+        time_start = int(time.time() * 1000)
         methods = FuncExtractor(filepath=self.filepath).parse_file()
+        print("FuncExtractor: " + str(int(time.time() * 1000) - time_start))
 
         """Do clone detection for each method."""
         for method in methods:
+            time_start = int(time.time() * 1000)
             clones = CloneDetection(
                 method=method, es_utils=self.es_utils
             ).run()
             # record the results
             self.record_clones(method=method, clones=clones)
+            print(
+                "CloneDetection: " + str(int(time.time() * 1000) - time_start)
+            )
 
+        time_start = int(time.time() * 1000)
         actions = []  # used to store the method infos
         # for changed methods, extract N-Gram list
         for method in methods:
@@ -347,6 +369,7 @@ class HandleFile(object):
             item=es_data,
             index_name="test_performance_handled_files",
         )
+        print("Storage: " + str(int(time.time() * 1000) - time_start))
 
 
 class LSICCDSSpeedDetector:
@@ -371,7 +394,7 @@ class LSICCDSSpeedDetector:
         # find all the java files
         list_of_files = []
         for root, directories, files in os.walk(
-            "test/test_speed_middle_results"
+            "test/test_speed_middle_results/fake_repos"
         ):
             for file in files:
                 if file.endswith(".java"):
@@ -387,12 +410,92 @@ class LSICCDSSpeedDetector:
         return end_time - start_time
 
 
-class NILSpeedDetector:
-    def __init__(self) -> None:
-        print("pause")
-
+class NILSpeedDetector(object):
     def run(self):
-        print("pause")
+        start_time = int(time.time() * 1000)
+        p = subprocess.Popen(
+            "java -jar test/NIL.jar -s test/test_speed_middle_results/fake_repos -mit 50 -mil 6 -t 1",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        _ = p.stdout.read().decode("utf-8", errors="replace")
+        _ = p.wait()
+        end_time = int(time.time() * 1000)
+        return end_time - start_time
+
+
+def record_time(repo_num: int, times: dict, filepath: str):
+    with open(filepath, "a") as f:
+        f.write(
+            str(repo_num)
+            + " LSICCDS:"
+            + str(times["LSICCDS"])
+            + " NIL:"
+            + str(times["NIL"])
+            + "\n"
+        )
+
+
+def insert_fake_records(es_utils: ESUtils, repo_num: int):
+    """Need to handle {repo_num} fake repositories. So we need to insert {repo_num-1} fake records."""
+    # Extract fake info from 1 project
+    methods_repo1 = []
+    list_of_files_repo1 = []
+    for root, directories, files in os.walk(
+        "test/test_speed_middle_results/fake_repos/1"
+    ):
+        for file in files:
+            if file.endswith(".java"):
+                methods = FuncExtractor(
+                    filepath=os.path.join(root, file)
+                ).parse_file()
+                for method in methods:
+                    method.filepath = os.path.relpath(
+                        os.path.join(root, file),
+                        "test/test_speed_middle_results/fake_repos/1",
+                    )
+                methods_repo1.extend(methods)
+                list_of_files_repo1.append(
+                    os.path.relpath(
+                        os.path.join(root, file),
+                        "test/test_speed_middle_results/fake_repos/1",
+                    )
+                )
+
+    for method in methods_repo1:
+        actions = []
+        code = " ".join(method.tokens)
+        for i in range(1, repo_num):
+            action = {
+                "_op_type": "create",
+                "_index": "test_performance_n_grams",
+                "filepath": os.path.join(
+                    "test/test_speed_middle_results/fake_repos",
+                    str(i),
+                    method.filepath,
+                ),
+                "start_line": method.start,
+                "end_line": method.end,
+                "code_ngrams": code,
+            }
+            actions.append(action)
+        es_utils.insert_es_bulk(actions)
+
+    for filepath in list_of_files_repo1:
+        actions = []
+        for i in range(1, repo_num):
+            action = {
+                "_op_type": "create",
+                "_index": "test_performance_handled_files",
+                "filepath": os.path.join(
+                    "test/test_speed_middle_results/fake_repos",
+                    str(i),
+                    filepath,
+                ),
+            }
+            actions.append(action)
+        es_utils.insert_es_bulk(actions)
 
 
 if __name__ == "__main__":
@@ -400,17 +503,32 @@ if __name__ == "__main__":
     # download the repository
     download_target_project()
 
-    # delete and re-create the indices
-    refresh_indices()
-
     # delete the clone_pairs file
     if os.path.exists("test/test_speed_middle_results/LSICCDS_clone_pairs"):
         os.remove("test/test_speed_middle_results/LSICCDS_clone_pairs")
 
-    for repo_num in range(1, REPONUM + 1):
+    # delete the time recorder
+    if os.path.exists("test/test_speed_middle_results/Compare_time"):
+        os.remove("test/test_speed_middle_results/Compare_time")
+
+    # add one repository each iteration
+    repo_num = 0
+    step = 1
+    while True:
+        repo_num += step
+
+        print("Repo num: {repo_num}".format(repo_num=repo_num))
 
         # copy the test repositories into directory "test/test_speed_middle_results/fake_repos"
         copy_fake_repos(repo_num=repo_num)
+
+        # delete and re-create the indices
+        refresh_indices()
+
+        # insert fake records into elasticsearch
+        insert_fake_records(
+            es_utils=ESUtils(config=service_config), repo_num=repo_num
+        )
 
         # run LSICCDSSpeedDetector
         LSICCDS_detector = LSICCDSSpeedDetector()
@@ -420,6 +538,11 @@ if __name__ == "__main__":
 
         # run NILSpeedDetector
         NIL_detector = NILSpeedDetector()
-        NIL_detector.run()
+        NIL_time = NIL_detector.run()
 
-    print("finish")
+        # record the time
+        record_time(
+            repo_num=repo_num,
+            times={"LSICCDS": "LSICCDS_time", "NIL": NIL_time},
+            filepath="test/test_speed_middle_results/Compare_time",
+        )
