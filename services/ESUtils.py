@@ -102,7 +102,7 @@ class ESUtils(object):
         helpers.bulk(self.client, bulk)
 
     def insert_es_item(self, item, index_name: str):
-        self.client.index(index=index_name, body=item)
+        self.client.index(index=index_name, body=item, refresh=True)
 
     def get_handled_commits(self, repo_id: int, index_name: str):
         handled_commits = set()

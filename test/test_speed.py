@@ -327,9 +327,9 @@ class HandleFile(object):
                 )
 
     def run(self):
-        print(
-            "[Info]: Handling file {filepath}".format(filepath=self.filepath)
-        )
+        # print(
+        #     "[Info]: Handling file {filepath}".format(filepath=self.filepath)
+        # )
 
         """Do clone detection for each method."""
         for method in self.methods:
@@ -339,20 +339,17 @@ class HandleFile(object):
             # record the results
             self.record_clones(method=method, clones=clones)
 
-        actions = []  # used to store the method infos
-        for method in self.methods:
             code = " ".join(method.tokens)
-            # update the inverted index of elastic search
-            action = {
-                "_op_type": "create",
-                "_index": "test_performance_n_grams",
+            es_data = {
                 "filepath": method.filepath,
                 "start_line": method.start,
                 "end_line": method.end,
                 "code_ngrams": code,
             }
-            actions.append(action)
-        self.es_utils.insert_es_bulk(actions)
+            self.es_utils.insert_es_item(
+                item=es_data,
+                index_name="test_performance_n_grams",
+            )
 
         """Finish handling this file, insert into the handled_files index in es."""
         es_data = {"filepath": self.filepath}
@@ -368,15 +365,10 @@ class LSICCDSSpeedDetector:
 
     def is_file_handled(self, filepath: str):
         query = {"term": {"filepath": filepath}}
-        scroll = "1m"
-        size = 50
-        page = self.es_utils.client.search(
-            index="test_performance_handled_files",
-            query=query,
-            scroll=scroll,
-            size=size,
+        result = self.es_utils.client.search(
+            index="test_performance_handled_files", query=query
         )
-        hits = page["hits"]["hits"]
+        hits = result["hits"]["hits"]
         return len(hits) > 0
 
     def run(self):
@@ -499,7 +491,7 @@ if __name__ == "__main__":
 
     # add one repository each iteration
     repo_num = 0
-    step = 1
+    step = 5
     while True:
         repo_num += step
 
@@ -529,6 +521,8 @@ if __name__ == "__main__":
         # record the time
         record_time(
             repo_num=repo_num,
-            times={"LSICCDS": "LSICCDS_time", "NIL": NIL_time},
+            times={"LSICCDS": LSICCDS_time, "NIL": NIL_time},
             filepath="test/test_speed_middle_results/Compare_time",
         )
+
+        break
