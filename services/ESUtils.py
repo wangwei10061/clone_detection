@@ -17,7 +17,7 @@ class ESUtils(object):
         self.client = self.connect()
 
     def connect(self):
-        client = Elasticsearch(self.urls)
+        client = Elasticsearch(self.urls, request_timeout=3600)
         return client
 
     def is_index_exists(self, index_name: str):
@@ -36,6 +36,7 @@ class ESUtils(object):
                 index=self.config["elasticsearch"]["index_ngram"],
                 body={
                     "settings": {
+                        "similarity": {"default": {"type": "boolean"}},
                         "analysis": {
                             "filter": {
                                 "my_shingle_filter": {
@@ -52,14 +53,13 @@ class ESUtils(object):
                             "analyzer": {
                                 "shingle_analyzer": {
                                     "filter": [
-                                        "lowercase",
                                         "my_shingle_filter",
                                     ],
                                     "type": "custom",
                                     "tokenizer": "whitespace",
                                 }
                             },
-                        }
+                        },
                     },
                     "mappings": {
                         "properties": {
@@ -74,7 +74,6 @@ class ESUtils(object):
                                 "analyzer": "shingle_analyzer",
                                 "search_analyzer": "shingle_analyzer",
                             },
-                            "code": {"index": False, "type": "text"},
                         }
                     },
                 },

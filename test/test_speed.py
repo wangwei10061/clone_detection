@@ -31,6 +31,21 @@ service_config = read_config(service_config_path)
 
 FakeTargetDir = "test/test_speed_middle_results/fake_repos"
 
+LSICCDS_TIMES = {
+    "tokenize_time": 0,
+    "inverted_index_time": 0,
+    "lf_phase_time": 0,
+    "verification_phase_time": 0,
+    "other_time": 0,
+    "verify_count": 0,
+    "tokenize_count": 0,
+}
+
+
+def init_variables():
+    for key in list(LSICCDS_TIMES.keys()):
+        LSICCDS_TIMES[key] = 0
+
 
 def download_target_project():
     target_dir = "test/test_speed_middle_results"
@@ -76,6 +91,9 @@ def refresh_indices():
     es_utils.client.indices.create(
         index=n_gram_index_name,
         settings={
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+            "similarity": {"default": {"type": "boolean"}},
             "analysis": {
                 "filter": {
                     "my_shingle_filter": {
@@ -88,7 +106,6 @@ def refresh_indices():
                 "analyzer": {
                     "shingle_analyzer": {
                         "filter": [
-                            "lowercase",
                             "my_shingle_filter",
                         ],
                         "type": "custom",
@@ -102,11 +119,9 @@ def refresh_indices():
                 "filepath": {"type": "keyword"},
                 "start_line": {"type": "integer"},
                 "end_line": {"type": "integer"},
-                "code_ngrams": {
-                    "type": "text",
-                    "analyzer": "shingle_analyzer",
-                    "search_analyzer": "shingle_analyzer",
-                },
+                "code_ngrams": {"type": "keyword"},
+                "code": {"type": "text"},
+                "gram_num": {"type": "integer"},
             }
         },
     )
@@ -149,10 +164,25 @@ class MethodInfo(object):
         else:
             self.tokens = None
 
+        if "code_ngrams" in kwargs:
+            self.code_ngrams = kwargs["code_ngrams"]
+        else:
+            self.code_ngrams = None
+
+        if "code" in kwargs:
+            self.code = kwargs["code"]
+        else:
+            self.code = None
+
         if "ngrams" in kwargs:
             self.ngrams = kwargs["ngrams"]
         else:
             self.ngrams = None
+
+        if "gram_num" in kwargs:
+            self.gram_num = kwargs["gram_num"]
+        else:
+            self.gram_num = None
 
 
 class FuncExtractor(object):
@@ -193,12 +223,23 @@ class FuncExtractor(object):
     def formMethodInfo(
         self, filepath: str, start_line: int, end_line: int, tokens: list
     ):
+        # extract code_ngrams and gram_num and code
+        code_ngrams = extract_n_grams(
+            tokens=tokens,
+            ngramSize=5,
+        )
+        code_ngrams = list(set(code_ngrams))
+        gram_num = len(code_ngrams)
+        code = " ".join(tokens)
         self.methods.append(
             MethodInfo(
                 filepath=filepath,
                 start=start_line,
                 end=end_line,
                 tokens=tokens,
+                code_ngrams=code_ngrams,
+                gram_num=gram_num,
+                code=code,
             )
         )
 
@@ -212,13 +253,13 @@ class CloneDetection(object):
         self.method = method
         self.es_utils = es_utils
 
-    def filterPhase(self, method: MethodInfo, candidates: List[dict]):
+    def filterPhase(self, candidates: List[dict]):
         """NIL filter phase.
         common distinct n-grams * 100 / min(distinct n-grams) >= 10%
         """
-        if method.ngrams is None:
-            method.ngrams = extract_n_grams(
-                tokens=" ".join(method.tokens).split(" "),
+        if self.method.ngrams is None:
+            self.method.ngrams = extract_n_grams(
+                tokens=self.method.tokens,
                 ngramSize=5,
             )
 
@@ -227,27 +268,32 @@ class CloneDetection(object):
                 tokens=candidate["code_ngrams"].split(" "),
                 ngramSize=5,
             )
-            minV = min(len(set(method.ngrams)), len(set(candidate_ngrams)))
+            minV = min(
+                len(set(self.method.ngrams)), len(set(candidate_ngrams))
+            )
             return (
-                len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
+                len(set(candidate_ngrams) & set(self.method.ngrams))
+                * 100
+                / minV
                 >= 10
             )
 
         return list(filter(_filter, candidates))
 
-    def verificationPhase(self, method: MethodInfo, candidates: List[dict]):
+    def verificationPhase(self, candidates: List[dict]):
         """NIL verify phase.
         lcs.calcLength(tokenSequence1, tokenSequence2) * 100 / min >= 70%
         """
-        X = " ".join(method.tokens).split(" ")
+        X = self.method.tokens
         result = []
         for candidate in candidates:
-            Y = candidate["code_ngrams"].split(" ")
+            Y = candidate["code"].split(" ")
             minV = min(len(X), len(Y))
             sim = LCS().lcs(X, Y) * 100 / minV
             if sim >= 70:
                 candidate["similarity"] = sim
                 result.append(candidate)
+        LSICCDS_TIMES["verify_count"] += len(candidates)
         return result
 
     def run(self):
@@ -256,17 +302,17 @@ class CloneDetection(object):
         search_results = []
         query = {
             "query": {
-                "bool": {
-                    "must": {
-                        "match": {
-                            "code_ngrams": {
-                                "query": " ".join(self.method.tokens)
-                            }
-                        }
-                    },
+                "terms_set": {
+                    "code_ngrams": {
+                        "terms": self.method.code_ngrams,
+                        "minimum_should_match_script": {
+                            "source": "Math.ceil(Math.min(params.num_terms, doc['gram_num'].value) * 0.1)"
+                        },
+                    }
                 }
             }
         }
+        lf_phase_start_time = int(time.time() * 1000)
         search_results = helpers.scan(
             client=self.es_utils.client,
             query=query,
@@ -282,19 +328,25 @@ class CloneDetection(object):
                     "start": search_result["_source"]["start_line"],
                     "end": search_result["_source"]["end_line"],
                     "code_ngrams": search_result["_source"]["code_ngrams"],
+                    "code": search_result["_source"]["code"],
+                    "gram_num": search_result["_source"]["gram_num"],
                 }
             )
+        LSICCDS_TIMES["lf_phase_time"] += (
+            int(time.time() * 1000) - lf_phase_start_time
+        )
 
         # 2. filter phase
-        candidates = self.filterPhase(
-            method=self.method, candidates=candidates
-        )
+        # time_start = int(time.time()*1000)
+        # candidates = self.filterPhase(candidates=candidates)
+        # print("filter phase: {time}".format(time=int(time.time()*1000)-time_start))
 
         # 3. verify phase
-        candidates = self.verificationPhase(
-            method=self.method, candidates=candidates
+        verification_phase_start_time = int(time.time() * 1000)
+        candidates = self.verificationPhase(candidates=candidates)
+        LSICCDS_TIMES["verification_phase_time"] += (
+            int(time.time() * 1000) - verification_phase_start_time
         )
-
         return candidates
 
 
@@ -339,16 +391,21 @@ class HandleFile(object):
             # record the results
             self.record_clones(method=method, clones=clones)
 
-            code = " ".join(method.tokens)
+            inverted_index_start_time = int(time.time() * 1000)
             es_data = {
                 "filepath": method.filepath,
                 "start_line": method.start,
                 "end_line": method.end,
-                "code_ngrams": code,
+                "code_ngrams": method.code_ngrams,
+                "code": method.code,
+                "gram_num": method.gram_num,
             }
             self.es_utils.insert_es_item(
                 item=es_data,
                 index_name="test_performance_n_grams",
+            )
+            LSICCDS_TIMES["inverted_index_time"] += (
+                int(time.time() * 1000) - inverted_index_start_time
             )
 
         """Finish handling this file, insert into the handled_files index in es."""
@@ -359,9 +416,10 @@ class HandleFile(object):
         )
 
 
-class LSICCDSSpeedDetector:
-    def __init__(self) -> None:
+class LSICCDSSpeedDetector(object):
+    def __init__(self, repo_num) -> None:
         self.es_utils = ESUtils(config=service_config)
+        self.repo_num = repo_num
 
     def is_file_handled(self, filepath: str):
         query = {"term": {"filepath": filepath}}
@@ -374,7 +432,15 @@ class LSICCDSSpeedDetector:
     def run(self):
         start_time = int(time.time() * 1000)
         # find all the unhandled methods
-        methods = FuncExtractor(folder=FakeTargetDir).parse()
+        tokenize_start_time = int(time.time() * 1000)
+        methods = FuncExtractor(
+            folder=os.path.join(FakeTargetDir, str(self.repo_num))
+        ).parse()
+        LSICCDS_TIMES["tokenize_time"] = (
+            int(time.time() * 1000) - tokenize_start_time
+        )
+        LSICCDS_TIMES["tokenize_count"] += len(methods)
+
         fm_dict = form_file_method_dict(methods=methods)
         for filepath in list(fm_dict.keys()):
             # check whether file have already handled
@@ -385,7 +451,27 @@ class LSICCDSSpeedDetector:
                     es_utils=self.es_utils,
                 ).run()
         end_time = int(time.time() * 1000)
-        return end_time - start_time
+
+        # extract time info
+        all_time = end_time - start_time
+        LSICCDS_TIMES["other_time"] = (
+            all_time
+            - LSICCDS_TIMES["tokenize_time"]
+            - LSICCDS_TIMES["inverted_index_time"]
+            - LSICCDS_TIMES["lf_phase_time"]
+            - LSICCDS_TIMES["verification_phase_time"]
+        )
+
+        return [
+            str(all_time),
+            str(LSICCDS_TIMES["tokenize_time"]),
+            str(LSICCDS_TIMES["inverted_index_time"]),
+            str(LSICCDS_TIMES["lf_phase_time"]),
+            str(LSICCDS_TIMES["verification_phase_time"]),
+            str(LSICCDS_TIMES["other_time"]),
+            str(LSICCDS_TIMES["verify_count"]),
+            str(LSICCDS_TIMES["tokenize_count"]),
+        ]
 
 
 class NILSpeedDetector(object):
@@ -399,10 +485,39 @@ class NILSpeedDetector(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        _ = p.stdout.read().decode("utf-8", errors="replace")
+        output = p.stdout.read().decode("utf-8", errors="replace")
         _ = p.wait()
         end_time = int(time.time() * 1000)
-        return end_time - start_time
+        # extract the time info
+        (
+            tokenize_time,
+            inverted_index_time,
+            location_phase_time,
+            filtration_phase_time,
+            verification_phase_time,
+            verifiy_count,
+            tokenize_count,
+        ) = output.split("\n")[-1].split(",")
+        all_time = end_time - start_time
+        other_time = (
+            all_time
+            - int(tokenize_time)
+            - int(inverted_index_time)
+            - int(location_phase_time)
+            - int(filtration_phase_time)
+            - int(verification_phase_time)
+        )
+        return [
+            str(all_time),
+            str(tokenize_time),
+            str(inverted_index_time),
+            str(location_phase_time),
+            str(filtration_phase_time),
+            str(verification_phase_time),
+            str(other_time),
+            str(verifiy_count),
+            str(tokenize_count),
+        ]
 
 
 def record_time(repo_num: int, times: dict, filepath: str):
@@ -432,7 +547,6 @@ def insert_fake_records(es_utils: ESUtils, repo_num: int):
 
     for method in methods_repo1:
         actions = []
-        code = " ".join(method.tokens)
         for i in range(1, repo_num):
             action = {
                 "_op_type": "create",
@@ -444,7 +558,9 @@ def insert_fake_records(es_utils: ESUtils, repo_num: int):
                 ),
                 "start_line": method.start,
                 "end_line": method.end,
-                "code_ngrams": code,
+                "code_ngrams": method.code_ngrams,
+                "code": method.code,
+                "gram_num": method.gram_num,
             }
             actions.append(action)
         es_utils.insert_es_bulk(actions)
@@ -490,10 +606,8 @@ if __name__ == "__main__":
         os.remove("test/test_speed_middle_results/Compare_time")
 
     # add one repository each iteration
-    repo_num = 0
-    step = 5
-    while True:
-        repo_num += step
+    repo_nums = [1, 5, 10, 20, 40, 80, 100, 200, 400, 800]
+    for repo_num in repo_nums:
 
         print("Repo num: {repo_num}".format(repo_num=repo_num))
 
@@ -508,21 +622,27 @@ if __name__ == "__main__":
             es_utils=ESUtils(config=service_config), repo_num=repo_num
         )
 
+        # re-init variables
+        init_variables()
+
         # run LSICCDSSpeedDetector
-        LSICCDS_detector = LSICCDSSpeedDetector()
+        LSICCDS_detector = LSICCDSSpeedDetector(repo_num)
         LSICCDS_time = (
             LSICCDS_detector.run()
         )  # get the time used for running the detection
+        print(LSICCDS_time)
 
         # run NILSpeedDetector
         NIL_detector = NILSpeedDetector()
         NIL_time = NIL_detector.run()
+        print(NIL_time)
 
         # record the time
         record_time(
             repo_num=repo_num,
-            times={"LSICCDS": LSICCDS_time, "NIL": NIL_time},
+            times={
+                "LSICCDS": ",".join(LSICCDS_time),
+                "NIL": ",".join(NIL_time),
+            },
             filepath="test/test_speed_middle_results/Compare_time",
         )
-
-        break

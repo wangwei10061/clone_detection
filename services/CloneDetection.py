@@ -23,7 +23,7 @@ class CloneDetection(object):
         """
         if method.ngrams is None:
             method.ngrams = extract_n_grams(
-                tokens=" ".join(method.tokens).split(" "),
+                tokens=method.tokens,
                 ngramSize=self.config["service"]["ngram"],
             )
 
@@ -48,7 +48,7 @@ class CloneDetection(object):
         """NIL verify phase.
         lcs.calcLength(tokenSequence1, tokenSequence2) * 100 / min >= 70%
         """
-        X = " ".join(method.tokens).split(" ")
+        X = method.tokens
         result = []
         for candidate in candidates:
             Y = candidate["code"].split(" ")

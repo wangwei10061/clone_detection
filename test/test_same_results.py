@@ -80,8 +80,8 @@ def find_unique_results(df1: pd.DataFrame, df2: pd.DataFrame):
 
 
 print("找到LSICCDS中有的而NIL中没有的结果")
-diffs = find_unique_results(LSICCDS_result, NIL_result)
+diffs_LSICCDS = find_unique_results(LSICCDS_result, NIL_result)
 
 print("找到NIL中有而LSICCDS中没有的结果")
-diffs = find_unique_results(NIL_result, LSICCDS_result)
+diffs_NIL = find_unique_results(NIL_result, LSICCDS_result)
 print("finish")
