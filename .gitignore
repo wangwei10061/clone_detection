@@ -17,6 +17,8 @@ clone_pairs
 code_blocks
 functions
 result_*.csv
+test/test_accuracy_middle_results
+test/test_scalability_middle_results
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

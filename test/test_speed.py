@@ -606,7 +606,7 @@ if __name__ == "__main__":
         os.remove("test/test_speed_middle_results/Compare_time")
 
     # add one repository each iteration
-    repo_nums = [1, 5, 10, 20, 40, 80, 100, 200, 400, 800]
+    repo_nums = [1, 5, 10, 20, 40, 80, 100, 200, 400]
     for repo_num in repo_nums:
 
         print("Repo num: {repo_num}".format(repo_num=repo_num))
