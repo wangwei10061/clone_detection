@@ -50,7 +50,7 @@ Install the dependencies using the following steps:
 
 6. Change the working directory to the root directory using command `cd ..`.
 
-7. Download [TXL](http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz) using command `wget http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz`.
+<!-- 7. Download [TXL](http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz) using command `wget http://www.txl.ca/download/16963-txl10.8b.linux64.tar.gz`.
 
 8. Download TXL:
 ```
@@ -79,7 +79,7 @@ rm 20818-NiCad-6.2.tar.gz
 cp NiCad-6.2/txl/java-extract-functions.txl services/parser/txl/grammers/java
 cp NiCad-6.2/txl/nicad.grm services/parser/txl/grammers/java
 rm -fr NiCad-6.2
-```
+``` -->
 
 10. Create python virtual environment using command `conda create -n LSICCDS_server python=3.7.11` based on conda. (Before this you need to install conda following this [guide](https://linuxize.com/post/how-to-install-anaconda-on-ubuntu-20-04/#:~:text=Complete%20the%20following%20steps%20to%20install%20Anaconda%20on,In%20order%20to%20continue%20the%20installation%20process%2C%20).)
 
@@ -98,4 +98,4 @@ rm -fr NiCad-6.2
 
 4. Change the configuration by modifying the gitea_password using your own password for user "test_performance", and the gitea_host using your own host address, the format should be IP:PORT
 
-5. 
+5.
