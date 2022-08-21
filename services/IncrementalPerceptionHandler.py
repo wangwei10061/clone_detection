@@ -32,7 +32,7 @@ class IncrementalPerceptionHandler(threading.Thread):
             on_message_callback=self.callback,
             auto_ack=True,
         )
-        channel.start_consuming()  # this will block if there is no task remained in the queue
+        channel.start_consuming()
 
         print("[Info]: Exist thread: " + self.name)
 
