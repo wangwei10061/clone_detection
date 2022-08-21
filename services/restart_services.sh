@@ -3,6 +3,7 @@
 restart_service()
 {
     service_name=$1
+    python_path="~/anaconda3/envs/LSICCDS_server/bin/python" # This should be changed to your local python path
     echo "-----------------------------"
     echo "Restarting service: $service_name..."
     script_name="$service_name.py"
@@ -12,14 +13,14 @@ restart_service()
     if [ -z "$old_pid" ];then
         echo "Process Non-existent!"
         echo "Starting Process...."
-        nohup ~/anaconda3/envs/LSICCDS_server/bin/python $script_name > $log_name 2>&1 &
+        nohup $python_path $script_name > $log_name 2>&1 &
     else
         kill -9 ${old_pid}
         mid_pid=$(ps ax|grep $1.py|grep -v grep|awk '{print $1}')
         if [ -z ${mid_pid} ];then
             echo "Process Close Success!"
             echo "Start Restarting....."
-            nohup ~/anaconda3/envs/LSICCDS_server/bin/python $script_name > $log_name 2>&1 &
+            nohup $python_path $script_name > $log_name 2>&1 &
         else
             echo "Process Close Fail!"
             exit 1
