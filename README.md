@@ -56,3 +56,5 @@ Install the dependencies using the following steps:
 9. Change the working directory to the `services` directory
 
 10. Run the service using command: `bash restart_services.sh`
+
+## The tree of this project
