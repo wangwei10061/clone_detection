@@ -67,7 +67,9 @@ Install the dependencies using the following steps:
     - `gitea_url` is the address of your local gitea service;
     - `token` is personal account token in which you installed the client service.
 
-11. Run the service using command: `bash restart_services.sh`
+11. Change the python path in `restart_services.sh` file.
+
+11. Run the service using command: `bash restart_services.sh`.
 
 ## The tree of this project
 ```
