@@ -2,23 +2,24 @@ dependencies/*
 !dependencies/docker-compose.yml
 services/config.yml
 .vscode/
-test/config.yml
-test/*.log
-test/*.json
-test/bare_repos
 *.out
-!test/6_fake_commitInfos.json
-test/7_*_result
 services/parser/txl
-!test/1_search_popular_active_projects.json
-test/nonbare_repos/
-test/test_speed_middle_results/
 clone_pairs
 code_blocks
 functions
 result_*.csv
-test/test_accuracy_middle_results
-test/test_scalability_middle_results
+test/
+# test/config.yml
+# test/*.log
+# test/*.json
+# test/bare_repos
+# !test/6_fake_commitInfos.json
+# test/7_*_result
+# !test/1_search_popular_active_projects.json
+# test/nonbare_repos/
+# test/test_speed_middle_results/
+# test/test_accuracy_middle_results
+# test/test_scalability_middle_results
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
