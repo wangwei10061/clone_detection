@@ -12,6 +12,7 @@ test/
 services/parser/java
 services/parser/FuncExtractor_txl.py
 services/parser/FuncExtractor.py
+README_previously.md
 # test/config.yml
 # test/*.log
 # test/*.json
