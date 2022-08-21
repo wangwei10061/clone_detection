@@ -31,11 +31,11 @@ def is_file_supported(filepath: str, lang_suffix: list):
     return False
 
 
-def extract_n_grams(tokens: str, ngramSize: int):
-    ngrams = []
+def extract_n_grams(tokens: list, ngramSize: int):
+    code_ngrams = []
     for i in range(len(tokens) - ngramSize + 1):
-        ngrams.append(" ".join(tokens[i : i + ngramSize]))
-    return ngrams
+        code_ngrams.append(" ".join(tokens[i : i + ngramSize]))
+    return code_ngrams
 
 
 def convert_time2utc(t, tz):

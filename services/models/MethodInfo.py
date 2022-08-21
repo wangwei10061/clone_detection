@@ -58,7 +58,12 @@ class MethodInfo(object):
         else:
             self.tokens = None
 
-        if "ngrams" in kwargs:
-            self.ngrams = kwargs["ngrams"]
+        if "code_ngrams" in kwargs:
+            self.code_ngrams = kwargs["code_ngrams"]
         else:
-            self.ngrams = None
+            self.code_ngrams = None
+
+        if "gram_num" in kwargs:
+            self.gram_num = kwargs["gram_num"]
+        else:
+            self.gram_num = None

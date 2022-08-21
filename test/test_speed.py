@@ -94,25 +94,6 @@ def refresh_indices():
             "number_of_shards": 1,
             "number_of_replicas": 0,
             "similarity": {"default": {"type": "boolean"}},
-            "analysis": {
-                "filter": {
-                    "my_shingle_filter": {
-                        "type": "shingle",
-                        "min_shingle_size": 5,
-                        "max_shingle_size": 5,
-                        "output_unigrams": "false",
-                    }
-                },
-                "analyzer": {
-                    "shingle_analyzer": {
-                        "filter": [
-                            "my_shingle_filter",
-                        ],
-                        "type": "custom",
-                        "tokenizer": "whitespace",
-                    }
-                },
-            },
         },
         mappings={
             "properties": {
@@ -174,10 +155,10 @@ class MethodInfo(object):
         else:
             self.code = None
 
-        if "ngrams" in kwargs:
-            self.ngrams = kwargs["ngrams"]
+        if "code_ngrams" in kwargs:
+            self.code_ngrams = kwargs["code_ngrams"]
         else:
-            self.ngrams = None
+            self.code_ngrams = None
 
         if "gram_num" in kwargs:
             self.gram_num = kwargs["gram_num"]
@@ -253,33 +234,6 @@ class CloneDetection(object):
         self.method = method
         self.es_utils = es_utils
 
-    def filterPhase(self, candidates: List[dict]):
-        """NIL filter phase.
-        common distinct n-grams * 100 / min(distinct n-grams) >= 10%
-        """
-        if self.method.ngrams is None:
-            self.method.ngrams = extract_n_grams(
-                tokens=self.method.tokens,
-                ngramSize=5,
-            )
-
-        def _filter(candidate):
-            candidate_ngrams = extract_n_grams(
-                tokens=candidate["code_ngrams"].split(" "),
-                ngramSize=5,
-            )
-            minV = min(
-                len(set(self.method.ngrams)), len(set(candidate_ngrams))
-            )
-            return (
-                len(set(candidate_ngrams) & set(self.method.ngrams))
-                * 100
-                / minV
-                >= 10
-            )
-
-        return list(filter(_filter, candidates))
-
     def verificationPhase(self, candidates: List[dict]):
         """NIL verify phase.
         lcs.calcLength(tokenSequence1, tokenSequence2) * 100 / min >= 70%
@@ -298,7 +252,7 @@ class CloneDetection(object):
 
     def run(self):
 
-        # 1. location phase
+        # 1. location and filtration phase
         search_results = []
         query = {
             "query": {
@@ -336,12 +290,7 @@ class CloneDetection(object):
             int(time.time() * 1000) - lf_phase_start_time
         )
 
-        # 2. filter phase
-        # time_start = int(time.time()*1000)
-        # candidates = self.filterPhase(candidates=candidates)
-        # print("filter phase: {time}".format(time=int(time.time()*1000)-time_start))
-
-        # 3. verify phase
+        # 2. verify phase
         verification_phase_start_time = int(time.time() * 1000)
         candidates = self.verificationPhase(candidates=candidates)
         LSICCDS_TIMES["verification_phase_time"] += (

@@ -4,7 +4,7 @@ gitea:
 elasticsearch:
   urls:
     - "http://localhost:9200"
-  index_ngram: "n_grams"
+  index_ngram: "handled_n_grams"
   index_handled_commits: "handled_commits"
 
 mysql:
@@ -41,3 +41,7 @@ txl:
 nil:
   basepath: "The absolute NIL tool path"
   rel_func_extractor_path: "Func-extractor-LSICCDS.jar"
+
+client_service:
+  gitea_url: "Your address for gitea service"
+  token: "Your personal account token who installed the webhook client service"

@@ -34,48 +34,21 @@ class ESUtils(object):
         else:
             self.client.indices.create(
                 index=self.config["elasticsearch"]["index_ngram"],
-                body={
-                    "settings": {
-                        "similarity": {"default": {"type": "boolean"}},
-                        "analysis": {
-                            "filter": {
-                                "my_shingle_filter": {
-                                    "type": "shingle",
-                                    "min_shingle_size": self.config["service"][
-                                        "ngram"
-                                    ],
-                                    "max_shingle_size": self.config["service"][
-                                        "ngram"
-                                    ],
-                                    "output_unigrams": "false",
-                                }
-                            },
-                            "analyzer": {
-                                "shingle_analyzer": {
-                                    "filter": [
-                                        "my_shingle_filter",
-                                    ],
-                                    "type": "custom",
-                                    "tokenizer": "whitespace",
-                                }
-                            },
-                        },
-                    },
-                    "mappings": {
-                        "properties": {
-                            "repo_id": {"type": "integer"},
-                            "commit_sha": {"type": "keyword"},
-                            "filepath": {"type": "keyword"},
-                            "start_line": {"type": "integer"},
-                            "end_line": {"type": "integer"},
-                            "created_at": {"type": "long"},
-                            "code_ngrams": {
-                                "type": "text",
-                                "analyzer": "shingle_analyzer",
-                                "search_analyzer": "shingle_analyzer",
-                            },
-                        }
-                    },
+                settings={
+                    "similarity": {"default": {"type": "boolean"}},
+                },
+                mappings={
+                    "properties": {
+                        "repo_id": {"type": "integer"},
+                        "commit_sha": {"type": "keyword"},
+                        "filepath": {"type": "keyword"},
+                        "start_line": {"type": "integer"},
+                        "end_line": {"type": "integer"},
+                        "created_at": {"type": "long"},
+                        "code_ngrams": {"type": "keyword"},
+                        "code": {"type": "text"},
+                        "gram_num": {"type": "integer"},
+                    }
                 },
             )
 
@@ -87,12 +60,10 @@ class ESUtils(object):
         else:
             self.client.indices.create(
                 index=self.config["elasticsearch"]["index_handled_commits"],
-                body={
-                    "mappings": {
-                        "properties": {
-                            "repo_id": {"type": "keyword"},
-                            "commit_sha": {"type": "keyword"},
-                        }
+                mappings={
+                    "properties": {
+                        "repo_id": {"type": "keyword"},
+                        "commit_sha": {"type": "keyword"},
                     }
                 },
             )
@@ -137,39 +108,41 @@ class ESUtils(object):
                 "filepath": changed_method.filepath.decode(),
                 "start_line": changed_method.start,
                 "end_line": changed_method.end,
-                "code_ngrams": code,
+                "code_ngrams": changed_method.code_ngrams,
+                "gram_num": changed_method.gram_num,
                 "code": code,
             }
             actions.append(action)
         return actions
 
-    def search_method(self, search_string: str):
-        body = {"query": {"match": {"code_ngrams": {"query": search_string}}}}
-        data = self.client.search(
-            index=self.config["elasticsearch"]["index_ngram"], body=body
-        )
-        return data.body["hits"]["hits"]
-
-    def search_method_filter(
-        self, search_string: str, repo_id: int, filepath: str
-    ):
-        body = {
+    def search_method_filter(self, method: MethodInfo):
+        query = {
             "query": {
                 "bool": {
                     "must": {
-                        "match": {"code_ngrams": {"query": search_string}}
+                        "terms_set": {
+                            "code_ngrams": {
+                                "terms": method.code_ngrams,
+                                "minimum_should_match_script": {
+                                    "source": "Math.ceil(Math.min(params.num_terms, doc['gram_num'].value) * 0.1)"
+                                },
+                            }
+                        }
                     },
                     "must_not": [
-                        {"match": {"repo_id": repo_id}},
-                        {"match": {"filepath": filepath}},
+                        {"match": {"repo_id": method.repo_id}},
+                        {"match": {"filepath": method.filepath.decode()}},
                     ],
                 }
             }
         }
-        data = self.client.search(
-            index=self.config["elasticsearch"]["index_ngram"], body=body
+        search_results = helpers.scan(
+            client=self.client,
+            query=query,
+            scroll="1m",
+            index=self.config["elasticsearch"]["index_ngram"],
         )
-        return data.body["hits"]["hits"]
+        return search_results
 
     def delete_index(self, index_name):
         if self.is_index_exists(index_name=index_name):

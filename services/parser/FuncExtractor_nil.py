@@ -7,7 +7,7 @@ from dulwich.objects import Commit
 from models.MethodInfo import MethodInfo
 from models.RepoInfo import RepoInfo
 
-from services.utils import convert_time2utc, is_file_supported
+from services.utils import convert_time2utc, extract_n_grams, is_file_supported
 
 
 class FuncExtractor:
@@ -56,7 +56,7 @@ class FuncExtractor:
         )
         output = p.stdout.read().decode("utf-8", errors="replace")
         _ = p.wait()
-        lines = output.split("\n")
+        lines = output.splitlines()
         method_num = int(lines[-1])
         if method_num > 0:
             for i in range(1, method_num + 1):
@@ -71,19 +71,30 @@ class FuncExtractor:
                 )
 
     def formMethodInfo(self, start_line: int, end_line: int, tokens: list):
+        # extract code_ngrams and gram_num and code
+        code_ngrams = extract_n_grams(
+            tokens=tokens,
+            ngramSize=self.config["service"]["ngram"],
+        )
+        code_ngrams = list(set(code_ngrams))
+        gram_num = len(code_ngrams)
+        code = " ".join(tokens)
         self.methods.append(
             MethodInfo(
                 repo_id=self.repoInfo.repo_id,
+                filepath=self.filepath,
+                start=start_line,
+                end=end_line,
+                tokens=tokens,
+                code_ngrams=code_ngrams,
+                gram_num=gram_num,
+                code=code,
                 ownername=self.repoInfo.ownername,
                 reponame=self.repoInfo.reponame,
                 commit_sha=self.commit_sha,
                 created_at=convert_time2utc(
                     self.commit.author_time, self.commit.author_timezone
                 ),
-                filepath=self.filepath,
-                start=start_line,
-                end=end_line,
-                tokens=tokens,
             )
         )
         for i in range(start_line, end_line + 1):

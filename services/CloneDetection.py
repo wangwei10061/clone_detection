@@ -8,7 +8,6 @@ from typing import List
 from ESUtils import ESUtils
 from LCS import LCS
 from models.MethodInfo import MethodInfo
-from utils import extract_n_grams
 
 
 class CloneDetection(object):
@@ -16,33 +15,6 @@ class CloneDetection(object):
         self.methods = methods
         self.config = config
         self.es_utils = ESUtils(config=self.config)
-
-    def filterPhase(self, method: MethodInfo, candidates: List[dict]):
-        """NIL filter phase.
-        common distinct n-grams * 100 / min(distinct n-grams) >= 10%
-        """
-        if method.ngrams is None:
-            method.ngrams = extract_n_grams(
-                tokens=method.tokens,
-                ngramSize=self.config["service"]["ngram"],
-            )
-
-        def _filter(candidate):
-            candidate_ngrams = extract_n_grams(
-                tokens=candidate["code"].split(" "),
-                ngramSize=self.config["service"]["ngram"],
-            )
-            minV = min(len(set(method.ngrams)), len(set(candidate_ngrams)))
-            return (
-                len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
-                >= self.config["service"]["filter_threshold"]
-            )
-            # return (
-            #     len(set(candidate_ngrams) & set(method.ngrams)) * 100 / minV
-            #     >= 1  # only for test
-            # )
-
-        return list(filter(_filter, candidates))
 
     def verificationPhase(self, method: MethodInfo, candidates: List[dict]):
         """NIL verify phase.
@@ -73,46 +45,36 @@ class CloneDetection(object):
                 }
             )
 
-            # 1. location phase
-            search_results = self.es_utils.search_method_filter(
-                search_string=" ".join(method.tokens),
-                repo_id=method.repo_id,
-                filepath=method.filepath.decode(),
-            )
-            # search_result = self.es_utils.search_method(search_string="> invoker invocation invocation rpccontext geturl service monitorservice method method monitorservice > last = invoker list")
+            # 1. location and filtration phase
+            result.setdefault(method_str, [])
+            search_results = self.es_utils.search_method_filter(method=method)
 
             for search_result in search_results:
-                result.setdefault(method_str, [])
                 result[method_str].append(
                     {
                         "commit_sha": search_result["_source"]["commit_sha"],
                         "created_at": search_result["_source"]["created_at"],
                         "repo_id": search_result["_source"]["repo_id"],
                         "filepath": search_result["_source"]["filepath"],
-                        "start": search_result["_source"]["start_line"],
-                        "end": search_result["_source"]["end_line"],
+                        "start_line": search_result["_source"]["start_line"],
+                        "end_line": search_result["_source"]["end_line"],
                         "code_ngrams": search_result["_source"]["code_ngrams"],
                         "code": search_result["_source"]["code"],
                     }
                 )
 
-            # 2. filter phase
-            result[method_str] = self.filterPhase(
-                method=method, candidates=result[method_str]
-            )
-
-            # 3. verify phase
+            # 2. verify phase
             result[method_str] = self.verificationPhase(
                 method=method, candidates=result[method_str]
             )
 
-            # 4. sort the result and get the oldest one
+            # 3. sort the result and get the oldest one
             def _sort_key(ele):
                 return ele["created_at"]
 
             result[method_str].sort(key=_sort_key)
 
-            # 5. keep the first one
+            # 4. keep the first one
             if len(result[method_str]) > 0:
                 result[method_str] = result[method_str][:1]
             else:

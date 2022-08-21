@@ -163,10 +163,10 @@ class MethodInfo(object):
         else:
             self.code = None
 
-        if "ngrams" in kwargs:
-            self.ngrams = kwargs["ngrams"]
+        if "code_ngrams" in kwargs:
+            self.code_ngrams = kwargs["code_ngrams"]
         else:
-            self.ngrams = None
+            self.code_ngrams = None
 
         if "gram_num" in kwargs:
             self.gram_num = kwargs["gram_num"]
@@ -246,8 +246,8 @@ class CloneDetection(object):
         """NIL filter phase.
         common distinct n-grams * 100 / min(distinct n-grams) >= 10%
         """
-        if self.method.ngrams is None:
-            self.method.ngrams = extract_n_grams(
+        if self.method.code_ngrams is None:
+            self.method.code_ngrams = extract_n_grams(
                 tokens=self.method.tokens,
                 ngramSize=5,
             )
@@ -258,10 +258,10 @@ class CloneDetection(object):
                 ngramSize=5,
             )
             minV = min(
-                len(set(self.method.ngrams)), len(set(candidate_ngrams))
+                len(set(self.method.code_ngrams)), len(set(candidate_ngrams))
             )
             return (
-                len(set(candidate_ngrams) & set(self.method.ngrams))
+                len(set(candidate_ngrams) & set(self.method.code_ngrams))
                 * 100
                 / minV
                 >= 10

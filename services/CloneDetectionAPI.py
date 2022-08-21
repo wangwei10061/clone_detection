@@ -4,7 +4,9 @@
 
 import json
 import os
+from urllib.parse import urljoin
 
+import requests
 from ChangedMethodExtractor import ChangedMethodExtractor
 from CloneDetection import CloneDetection
 from dulwich.diff_tree import tree_changes
@@ -20,12 +22,14 @@ app = Flask(__name__)
 class HandlePR(object):
     def __init__(
         self,
+        pr_id: int,
         base_repo_id: int,
         head_repo_id: int,
         base_commit_sha: str,
         head_commit_sha: str,
     ):
 
+        self.pr_id = pr_id
         self.base_repo_id = base_repo_id
         self.head_repo_id = head_repo_id
         self.base_commit_sha = base_commit_sha
@@ -134,42 +138,103 @@ class HandlePR(object):
         ).run()
         return result
 
+    def return_result(self, result: dict):
+        clone_item = """
+        File: {filepath} - {start_line} ~ {end_line}
+        Clone from:
+        - Repository: {ownername}/{reponame}
+        - Commit: {commit_sha}
+        - File: {filepath_clone}
+        - lines: {start_line_clone} ~ {end_line_clone}\n
+        """
+        body = ""
+        for method_str, clones in result.items():
+            clone = clones[0]
+            repo_id = clone["repo_id"]
+            clone_repo_info = self.mysql_utils.get_repo_info(repo_id=repo_id)
+            if clone_repo_info is None:
+                continue
+            ms = json.loads(method_str)
+            filepath = ms["filepath"]
+            start_line = ms["start"]
+            end_line = ms["end"]
+            ownername = clone_repo_info["owner_name"]
+            reponame = clone_repo_info["name"]
+            commit_sha = clone["commit_sha"]
+            filepath_clone = clone["filepath"]
+            start_line_clone = clone["start_line"]
+            end_line_clone = clone["end_line"]
+            body += clone_item.format(
+                filepath=filepath,
+                start_line=start_line,
+                end_line=end_line,
+                ownername=ownername,
+                reponame=reponame,
+                commit_sha=commit_sha,
+                filepath_clone=filepath_clone,
+                start_line_clone=start_line_clone,
+                end_line_clone=end_line_clone,
+            )
+
+        if len(body) == 0:
+            return
+
+        token = self.config["client_service"]["token"]
+        headers = {
+            "Authorization": "token " + token,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        gitea_url = self.config["client_service"]["gitea_url"]
+        url = urljoin(
+            gitea_url,
+            "api/v1/repos/{owner}/{repo}/issues/{index}/comments".format(
+                owner=self.baseRepoInfo.ownername,
+                repo=self.baseRepoInfo.reponame,
+                index=self.pr_id,
+            ),
+        )
+
+        result = requests.post(
+            url=url, data=json.dumps({"body": body}), headers=headers
+        )
+        if result.status_code != 201:
+            print("Error: create repository error")
+
 
 @app.route("/clone_detection", methods=["POST"])
 def clone_detection_api():
     data = request.get_json()
-    if (
-        "base_repo_id" not in data
-        or "head_repo_id" not in data
-        or "head_commit_sha" not in data
-        or "base_commit_sha" not in data
-    ):
-        return "RESTful request error: repo_id or head_commit_sha or base_commit_sha parameter not found!"
+    if data["action"] == "opened":
+        if "pull_request" not in data:
+            return {"Query": "No need for prediction!"}
+        else:
+            pr_id = data["pull_request"]["id"]
+            base = data["pull_request"]["base"]
+            head = data["pull_request"]["head"]
+
+            base_repo_id = base["repo_id"]
+            head_repo_id = head["repo_id"]
+
+            base_commit_sha = base["sha"]
+            head_commit_sha = head["sha"]
+
+            prHandler = HandlePR(
+                pr_id=pr_id,
+                base_repo_id=base_repo_id,
+                head_repo_id=head_repo_id,
+                base_commit_sha=base_commit_sha,
+                head_commit_sha=head_commit_sha,
+            )
+            result = prHandler.parse()
+
+            # return by comment api
+            if len(result) > 0:
+                prHandler.return_result(result=result)
+            return {"Query": "Success!"}
+
     else:
-        base_repo_id = data["base_repo_id"]
-        if type(base_repo_id) != int:
-            return "RESTful request error: base_repo_id should be an integer!"
-
-        head_repo_id = data["head_repo_id"]
-        if type(head_repo_id) != int:
-            return "RESTful request error: head_repo_id should be an integer!"
-
-        head_commit_sha = data["head_commit_sha"]
-        if type(head_commit_sha) != str:
-            return "RESTful request error: new commit shas should be a string!"
-
-        base_commit_sha = data["base_commit_sha"]
-        if type(base_commit_sha) != str:
-            return "RESTful request error: old commit sha should be a string!"
-
-        result = HandlePR(
-            base_repo_id=base_repo_id,
-            head_repo_id=head_repo_id,
-            base_commit_sha=base_commit_sha,
-            head_commit_sha=head_commit_sha,
-        ).parse()
-
-        return json.dumps(result)
+        return {"Query": "No need for prediction!"}
 
 
 if __name__ == "__main__":
