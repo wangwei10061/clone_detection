@@ -3,7 +3,7 @@
 restart_service()
 {
     service_name=$1
-    python_path="~/anaconda3/envs/LSICCDS_server/bin/python" # This should be changed to your local python path
+    python_path="/home/zxh/anaconda3/envs/LSICCDS_server/bin/python" # This should be changed to your local python path
     echo "-----------------------------"
     echo "Restarting service: $service_name..."
     script_name="$service_name.py"
