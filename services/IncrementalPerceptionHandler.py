@@ -7,13 +7,12 @@ import os
 import threading
 
 import IncrementalPerceptionAPI as apiClass
+from ColdStartPerception import HandleCommit
 from dulwich.repo import Repo
 from ESUtils import ESUtils
 from models.CommitInfo import CommitInfo
 from models.RepoInfo import RepoInfo
 from RabbitmqUtils import RabbitmqUtils
-
-from services.ColdStartPerception import HandleCommit
 
 
 class IncrementalPerceptionHandler(threading.Thread):
