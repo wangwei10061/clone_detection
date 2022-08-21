@@ -51,11 +51,23 @@ Install the dependencies using the following steps:
 
 7. Activate the python virtual environment using command `conda activate LSICCDS_server`.
 
-8. Install dependent python packages using command `pip install -r requirements.txt`
+8. Install dependent python packages using command `pip install -r requirements.txt`.
 
-9. Change the working directory to the `services` directory
+9. Change the working directory to the `services` directory using command: `cd ../services`.
 
-10. Run the service using command: `bash restart_services.sh`
+10. Change the configuration:
+  - Copy the configuration file from the template using command: `cp config-template.yml config.yml`;
+  - Change `gitea/repositories_path`;
+  - Change `elasticsearch/urls` and the names of indexes, including `elasticsearch/index_ngram` and `elasticsearch/index_handled_commits` as you want;
+  - Change `mysql`;
+  - Change `rabbitmq`;
+  - Change the number of threads for running `coldstart_service` and `incremental_service`;
+  - Change the absolute base path of `nil`;
+  - Change `client_service`:
+    - `gitea_url` is the address of your local gitea service;
+    - `token` is personal account token in which you installed the client service.
+
+11. Run the service using command: `bash restart_services.sh`
 
 ## The tree of this project
 ```
@@ -63,30 +75,29 @@ Install the dependencies using the following steps:
 ├── dependencies -- the dir for dependencies of LSICCDS
 │   ├── docker-compose.yml -- the docker-compose starting the dependencies
 ├── LICENSE -- the license file
-├── pics -- the pictures in README.
+├── pics -- the pictures in README.md file
 │   ├── gitea-setting.jpeg
 │   └── gitea-system-webhook-setting.png
 ├── pyproject.toml
-├── README_2.md
 ├── README.md
-├── requirements.txt
-└── services
-    ├── ChangedMethodExtractor.py
-    ├── CloneDetectionAPI.py
-    ├── CloneDetection.py
-    ├── ColdStartPerception.py
-    ├── config-template.yml
-    ├── config.yml
-    ├── ESUtils.py
-    ├── IncrementalPerceptionAPI.py
-    ├── IncrementalPerceptionHandler.py
+├── requirements.txt -- the requirements of python packages
+└── services -- the services of LSICCDS
+    ├── ChangedMethodExtractor.py -- the class for extracting changes in source code file
+    ├── CloneDetectionAPI.py -- the Clone Detection and Search services
+    ├── CloneDetection.py -- the class for clone detection related methods
+    ├── ColdStartPerception.py -- the Cold Start Service
+    ├── config-template.yml -- the template of configuration file
+    ├── ESUtils.py -- the utility file of Elasticsearch
+    ├── IncrementalPerceptionAPI.py -- the producer of Incremental Service
+    ├── IncrementalPerceptionHandler.py -- the consumer of Incremental Service
     ├── __init__.py
-    ├── LCS.py
-    ├── models
-    ├── MySQLUtils.py
+    ├── LCS.py -- Longest Common Subsequence algorithm
+    ├── models -- the models defined for running the service
+    ├── MySQLUtils.py -- the utility file of mysql
     ├── parser
-    ├── __pycache__
-    ├── RabbitmqUtils.py
-    ├── restart_services.sh
-    └── utils.py
+    |   ├── FuncExtractor_nil.py -- the script of invoking function extractor of NIL
+    |   └── nil -- the function extractor of NIL
+    ├── RabbitmqUtils.py -- the utility file of rabbitmq
+    ├── restart_services.sh -- the script for restarting LSICCDS's services
+    └── utils.py -- the utility file
 ```

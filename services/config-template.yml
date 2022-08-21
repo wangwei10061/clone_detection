@@ -1,5 +1,5 @@
 gitea:
-  repositories_path: "path to your cloned folder.../LSICCDS_server/dependencies/gitea/git/repositories"
+  repositories_path: "Your project root path on your local machine/dependencies/gitea/git/repositories"
 
 elasticsearch:
   urls:
@@ -27,19 +27,14 @@ service:
   filter_threshold: 10
   verify_threshold: 70
 
-codestart_service:
+coldstart_service:
   THREADNUM: 2
 
 incremental_service:
   THREADNUM: 2
 
-txl:
-  basepath: "The absolute TXL tool path"
-  relbinpath: "The relative path of txl bin file"
-  relextractorpath: "The relative path of java function extractor"
-
 nil:
-  basepath: "The absolute NIL tool path"
+  basepath: "Your project root path on your local machine/parser/nil"
   rel_func_extractor_path: "Func-extractor-LSICCDS.jar"
 
 client_service:

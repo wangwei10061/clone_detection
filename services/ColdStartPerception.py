@@ -225,7 +225,7 @@ def handle_repositories(repositories_path: str, config: dict):
 
             workQueue.put(RepoInfo(repo_path=repo_git_path))
 
-    THREADNUM = config["codestart_service"]["THREADNUM"]
+    THREADNUM = config["coldstart_service"]["THREADNUM"]
     threads = []
     for i in range(THREADNUM):
         t = HandleRepoThread(
