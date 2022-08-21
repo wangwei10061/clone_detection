@@ -58,3 +58,35 @@ Install the dependencies using the following steps:
 10. Run the service using command: `bash restart_services.sh`
 
 ## The tree of this project
+```
+.
+├── dependencies -- the dir for dependencies of LSICCDS
+│   ├── docker-compose.yml -- the docker-compose starting the dependencies
+├── LICENSE -- the license file
+├── pics -- the pictures in README.
+│   ├── gitea-setting.jpeg
+│   └── gitea-system-webhook-setting.png
+├── pyproject.toml
+├── README_2.md
+├── README.md
+├── requirements.txt
+└── services
+    ├── ChangedMethodExtractor.py
+    ├── CloneDetectionAPI.py
+    ├── CloneDetection.py
+    ├── ColdStartPerception.py
+    ├── config-template.yml
+    ├── config.yml
+    ├── ESUtils.py
+    ├── IncrementalPerceptionAPI.py
+    ├── IncrementalPerceptionHandler.py
+    ├── __init__.py
+    ├── LCS.py
+    ├── models
+    ├── MySQLUtils.py
+    ├── parser
+    ├── __pycache__
+    ├── RabbitmqUtils.py
+    ├── restart_services.sh
+    └── utils.py
+```
